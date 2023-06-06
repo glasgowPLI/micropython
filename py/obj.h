@@ -37,7 +37,10 @@
 // This is the definition of the opaque MicroPython object type.
 // All concrete objects have an encoding within this type and the
 // particular encoding is specified by MICROPY_OBJ_REPR.
-#if MICROPY_OBJ_REPR == MICROPY_OBJ_REPR_D
+#if __CHERI_PURE_CAPABILITY__
+typedef uintptr_t mp_obj_t;
+typedef uintptr_t mp_const_obj_t;
+#elif MICROPY_OBJ_REPR == MICROPY_OBJ_REPR_D
 typedef uint64_t mp_obj_t;
 typedef uint64_t mp_const_obj_t;
 #else
@@ -345,7 +348,7 @@ typedef union _mp_rom_obj_t {
 typedef mp_const_obj_t mp_rom_obj_t;
 #define MP_ROM_INT(i) MP_OBJ_NEW_SMALL_INT(i)
 #define MP_ROM_QSTR(q) MP_OBJ_NEW_QSTR(q)
-#define MP_ROM_PTR(p) (p)
+#define MP_ROM_PTR(p) ((mp_rom_obj_t)(p))
 /* for testing
 typedef struct _mp_rom_obj_t { mp_const_obj_t o; } mp_rom_obj_t;
 #define MP_ROM_INT(i) {MP_OBJ_NEW_SMALL_INT(i)}

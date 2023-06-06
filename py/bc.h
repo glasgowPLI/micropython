@@ -294,9 +294,9 @@ const byte *mp_bytecode_print_str(const mp_print_t *print, const byte *ip_start,
 
 static inline void mp_module_context_alloc_tables(mp_module_context_t *context, size_t n_qstr, size_t n_obj) {
     #if MICROPY_EMIT_BYTECODE_USES_QSTR_TABLE
-    size_t nq = (n_qstr * sizeof(qstr_short_t) + sizeof(mp_uint_t) - 1) / sizeof(mp_uint_t);
+    size_t nq = (n_qstr * sizeof(qstr_short_t) + sizeof(uintptr_t) - 1) / sizeof(uintptr_t);
     size_t no = n_obj;
-    mp_uint_t *mem = m_new(mp_uint_t, nq + no);
+    uintptr_t *mem = m_new(uintptr_t, nq + no);
     context->constants.qstr_table = (qstr_short_t *)mem;
     context->constants.obj_table = (mp_obj_t *)(mem + nq);
     #else
