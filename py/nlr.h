@@ -76,7 +76,11 @@
         #define MICROPY_NLR_NUM_REGS (MICROPY_NLR_NUM_REGS_ARM_THUMB_FP)
     #endif
 #elif defined(__aarch64__)
-    #define MICROPY_NLR_AARCH64 (1)
+    #if defined(__ARM_FEATURE_C64)
+        #define MICROPY_NLR_MORELLO (1)
+    #else
+        #define MICROPY_NLR_AARCH64 (1)
+    #endif
     #define MICROPY_NLR_NUM_REGS (MICROPY_NLR_NUM_REGS_AARCH64)
 #elif defined(__xtensa__)
     #define MICROPY_NLR_XTENSA (1)
