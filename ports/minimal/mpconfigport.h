@@ -21,12 +21,26 @@
 
 // type definitions for the specific machine
 
+#ifdef __CHERI_PURE_CAPABILITY__
+// On purecap builds we need our standard integer types not to carry provenance
+typedef int64_t mp_int_t; // must be pointer size -- or does it?
+typedef uint64_t mp_uint_t; // must be pointer size -- or does it?
+#else
 typedef intptr_t mp_int_t; // must be pointer size
 typedef uintptr_t mp_uint_t; // must be pointer size
+#endif
+
 typedef long mp_off_t;
 
+#ifdef __FreeBSD__
+#define MICROPY_HEAP_SIZE (25600)
+#define MICROPY_MIN_USE_STDOUT (1)
+// We need to provide a declaration/definition of alloca() -- BSD does not have alloca.h
+#include <stdlib.h>
+#else
 // We need to provide a declaration/definition of alloca()
 #include <alloca.h>
+#endif
 
 #define MICROPY_HW_BOARD_NAME "minimal"
 #define MICROPY_HW_MCU_NAME "unknown-cpu"
