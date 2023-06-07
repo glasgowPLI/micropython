@@ -454,7 +454,7 @@ STATIC mp_obj_t stream_seek(size_t n_args, const mp_obj_t *args) {
 
     const mp_stream_p_t *stream_p = mp_get_stream(args[0]);
     int error;
-    mp_uint_t res = stream_p->ioctl(args[0], MP_STREAM_SEEK, (mp_uint_t)(uintptr_t)&seek_s, &error);
+    mp_uint_t res = stream_p->ioctl(args[0], MP_STREAM_SEEK, (uintptr_t)&seek_s, &error);
     if (res == MP_STREAM_ERROR) {
         mp_raise_OSError(error);
     }
@@ -544,7 +544,7 @@ off_t mp_stream_posix_lseek(void *stream, off_t offset, int whence) {
     struct mp_stream_seek_t seek_s;
     seek_s.offset = offset;
     seek_s.whence = whence;
-    mp_uint_t res = stream_p->ioctl(MP_OBJ_FROM_PTR(stream), MP_STREAM_SEEK, (mp_uint_t)(uintptr_t)&seek_s, &errno);
+    mp_uint_t res = stream_p->ioctl(MP_OBJ_FROM_PTR(stream), MP_STREAM_SEEK, (uintptr_t)&seek_s, &errno);
     if (res == MP_STREAM_ERROR) {
         return -1;
     }
