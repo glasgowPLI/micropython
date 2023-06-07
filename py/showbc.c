@@ -81,7 +81,7 @@
 
 #define DECODE_OBJ \
     DECODE_UINT; \
-    unum = (mp_uint_t)obj_table[unum]
+    unum_obj = obj_table[unum]
 
 void mp_bytecode_print(const mp_print_t *print, const mp_raw_code_t *rc, const mp_module_constants_t *cm) {
     const byte *ip_start = rc->fun_data;
@@ -167,6 +167,7 @@ const byte *mp_bytecode_print_str(const mp_print_t *print, const byte *ip_start,
     #endif
     const mp_obj_t *obj_table = cm->obj_table;
     mp_uint_t unum;
+    mp_obj_t unum_obj;
     qstr qst;
 
     switch (*ip++) {
@@ -202,8 +203,8 @@ const byte *mp_bytecode_print_str(const mp_print_t *print, const byte *ip_start,
 
         case MP_BC_LOAD_CONST_OBJ:
             DECODE_OBJ;
-            mp_printf(print, "LOAD_CONST_OBJ %p=", MP_OBJ_TO_PTR(unum));
-            mp_obj_print_helper(print, (mp_obj_t)unum, PRINT_REPR);
+            mp_printf(print, "LOAD_CONST_OBJ %p=", MP_OBJ_TO_PTR(unum_obj));
+            mp_obj_print_helper(print, unum_obj, PRINT_REPR);
             break;
 
         case MP_BC_LOAD_NULL:

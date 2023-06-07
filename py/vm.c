@@ -665,7 +665,7 @@ dispatch_loop:
                 ENTRY(MP_BC_UNWIND_JUMP): {
                     MARK_EXC_IP_SELECTIVE();
                     DECODE_SLABEL;
-                    PUSH((mp_obj_t)(mp_uint_t)(uintptr_t)(ip + slab)); // push destination ip for jump
+                    PUSH((mp_obj_t)(uintptr_t)(ip + slab)); // push destination ip for jump
                     PUSH((mp_obj_t)(mp_uint_t)(*ip)); // push number of exception handlers to unwind (0x80 bit set if we also need to pop stack)
 unwind_jump:;
                     mp_uint_t unum = (mp_uint_t)POP(); // get number of exception handlers to unwind
