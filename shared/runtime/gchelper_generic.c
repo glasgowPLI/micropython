@@ -125,6 +125,37 @@ STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
 
 #elif defined(__aarch64__)
 
+#if defined(__ARM_FEATURE_C64)
+// Morello
+
+STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
+    const register uintptr_t c19 asm ("c19");
+    const register uintptr_t c20 asm ("c20");
+    const register uintptr_t c21 asm ("c21");
+    const register uintptr_t c22 asm ("c22");
+    const register uintptr_t c23 asm ("c23");
+    const register uintptr_t c24 asm ("c24");
+    const register uintptr_t c25 asm ("c25");
+    const register uintptr_t c26 asm ("c26");
+    const register uintptr_t c27 asm ("c27");
+    const register uintptr_t c28 asm ("c28");
+    const register uintptr_t c29 asm ("c29");
+    arr[0] = c19;
+    arr[1] = c20;
+    arr[2] = c21;
+    arr[3] = c22;
+    arr[4] = c23;
+    arr[5] = c24;
+    arr[6] = c25;
+    arr[7] = c26;
+    arr[8] = c27;
+    arr[9] = c28;
+    arr[10] = c29;
+}
+
+
+#else
+
 STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
     const register long x19 asm ("x19");
     const register long x20 asm ("x20");
@@ -149,6 +180,8 @@ STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
     arr[9] = x28;
     arr[10] = x29;
 }
+
+#endif
 
 #else
 
@@ -177,7 +210,16 @@ MP_NOINLINE void gc_helper_collect_regs_and_stack(void) {
     gc_helper_get_regs(regs);
     // GC stack (and regs because we captured them)
     void **regs_ptr = (void **)(void *)&regs;
-    gc_collect_root(regs_ptr, ((uintptr_t)MP_STATE_THREAD(stack_top) - (uintptr_t)&regs) / sizeof(uintptr_t));
+    size_t length = (uintptr_t)MP_STATE_THREAD(stack_top) - (uintptr_t)&regs;
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheriintrin.h>
+    // undo automatic narrowing of capability bounds and set bounds to length
+    __asm("scvalue %0, csp, %1\n"
+          "scbnds %0, %0, %2\n"
+        : "=&C" (regs_ptr)
+        : "r" (cheri_address_get(&regs)), "r" (length));
+#endif
+    gc_collect_root(regs_ptr, length / sizeof(uintptr_t));
 }
 
 #endif // MICROPY_ENABLE_GC
