@@ -96,7 +96,11 @@ STATIC NORETURN void syntax_error(void) {
 STATIC mp_obj_t uctypes_struct_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 2, 3, false);
     mp_obj_uctypes_struct_t *o = mp_obj_malloc(mp_obj_uctypes_struct_t, type);
+#ifdef __CHERI_PURE_CAPABILITY__
+    o->addr = (void *)mp_obj_cap_get(args[0]);
+#else 
     o->addr = (void *)(uintptr_t)mp_obj_int_get_truncated(args[0]);
+#endif
     o->desc = args[1];
     o->flags = LAYOUT_NATIVE;
     if (n_args == 3) {
@@ -616,21 +620,33 @@ STATIC mp_int_t uctypes_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, 
 STATIC mp_obj_t uctypes_struct_addressof(mp_obj_t buf) {
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(buf, &bufinfo, MP_BUFFER_READ);
+#ifdef __CHERI_PURE_CAPABILITY__
+    return mp_obj_new_cap(bufinfo.buf);
+#else
     return mp_obj_new_int((mp_int_t)(uintptr_t)bufinfo.buf);
+#endif
 }
 MP_DEFINE_CONST_FUN_OBJ_1(uctypes_struct_addressof_obj, uctypes_struct_addressof);
 
 // bytearray_at()
 // Capture memory at given address of given size as bytearray.
 STATIC mp_obj_t uctypes_struct_bytearray_at(mp_obj_t ptr, mp_obj_t size) {
+#ifdef __CHERI_PURE_CAPABILITY__
+    return mp_obj_new_bytearray_by_ref(mp_obj_int_get_truncated(size), (void *)mp_obj_cap_get(ptr));
+#else
     return mp_obj_new_bytearray_by_ref(mp_obj_int_get_truncated(size), (void *)(uintptr_t)mp_obj_int_get_truncated(ptr));
+#endif
 }
 MP_DEFINE_CONST_FUN_OBJ_2(uctypes_struct_bytearray_at_obj, uctypes_struct_bytearray_at);
 
 // bytes_at()
 // Capture memory at given address of given size as bytes.
 STATIC mp_obj_t uctypes_struct_bytes_at(mp_obj_t ptr, mp_obj_t size) {
+#ifdef __CHERI_PURE_CAPABILITY__
+    return mp_obj_new_bytes((void*)mp_obj_cap_get(ptr), mp_obj_int_get_truncated(size)); 
+#else
     return mp_obj_new_bytes((void *)(uintptr_t)mp_obj_int_get_truncated(ptr), mp_obj_int_get_truncated(size));
+#endif
 }
 MP_DEFINE_CONST_FUN_OBJ_2(uctypes_struct_bytes_at_obj, uctypes_struct_bytes_at);
 
