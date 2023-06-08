@@ -115,9 +115,14 @@ STATIC mp_fp_as_int_class_t mp_classify_fp_as_int(mp_float_t val) {
     } else {
         e &= ~((1U << MP_FLOAT_EXP_SHIFT_I32) - 1);
     }
+#ifdef __CHERI_PURE_CAPABILITY__
+    // Only half the bits of a CHERI capability can be used as an int
+    if (e <= ((4 * sizeof(uintptr_t) + MP_FLOAT_EXP_BIAS - 3) << MP_FLOAT_EXP_SHIFT_I32)) {
+#else
     // 8 * sizeof(uintptr_t) counts the number of bits for a small int
     // TODO provide a way to configure this properly
     if (e <= ((8 * sizeof(uintptr_t) + MP_FLOAT_EXP_BIAS - 3) << MP_FLOAT_EXP_SHIFT_I32)) {
+#endif
         return MP_FP_CLASS_FIT_SMALLINT;
     }
     #if MICROPY_LONGINT_IMPL == MICROPY_LONGINT_IMPL_LONGLONG
