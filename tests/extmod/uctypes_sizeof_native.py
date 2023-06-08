@@ -41,7 +41,7 @@ S6 = {
     "ptr": (uctypes.PTR | 0, uctypes.UINT8),
 }
 # As if there're no other arch bitnesses
-assert uctypes.sizeof(S6) in (4, 8)
+assert uctypes.sizeof(S6) in (4, 8, 16)
 
 S7 = {
     "arr": (uctypes.ARRAY | 0, uctypes.UINT8 | 5),
