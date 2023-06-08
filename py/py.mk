@@ -136,6 +136,7 @@ PY_CORE_O_BASENAME = $(addprefix py/,\
 	objbool.o \
 	objboundmeth.o \
 	objcell.o \
+	objcap.o \
 	objclosure.o \
 	objcomplex.o \
 	objdeque.o \
