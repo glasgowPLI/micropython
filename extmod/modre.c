@@ -45,6 +45,10 @@
 
 #define FLAG_DEBUG 0x1000
 
+#ifdef __FreeBSD__
+#define re_exec mp_re_exec // avoid name conflict
+#endif
+
 typedef struct _mp_obj_re_t {
     mp_obj_base_t base;
     ByteProg re;
