@@ -214,10 +214,7 @@ MP_NOINLINE void gc_helper_collect_regs_and_stack(void) {
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheriintrin.h>
     // undo automatic narrowing of capability bounds and set bounds to length
-    __asm("scvalue %0, csp, %1\n"
-          "scbnds %0, %0, %2\n"
-        : "=&C" (regs_ptr)
-        : "r" (cheri_address_get(&regs)), "r" (length));
+    regs_ptr = cheri_bounds_set(cheri_address_set(__builtin_cheri_stack_get(), cheri_address_get(&regs)), length);
 #endif
     gc_collect_root(regs_ptr, length / sizeof(uintptr_t));
 }
