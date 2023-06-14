@@ -115,7 +115,7 @@ STATIC mp_obj_t cap_to_bytes(size_t n_args, const mp_obj_t *args) {
 
     vstr_t vstr;
     // ensure our buffer is properly aligned
-    void ** buf = m_new(void*, (len + sizeof(void*) - 1) / sizeof(void*));
+    void ** buf = m_new(void*, (len + sizeof(void*)) / sizeof(void*));
     vstr_init_fixed_buf(&vstr, len+1, (void *)buf);
     vstr.len = len;
     vstr.fixed_buf = false; // we don't actually want a fixed buffer, just needed to manually align
