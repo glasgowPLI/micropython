@@ -226,6 +226,9 @@ qstr qstr_from_strn(const char *str, size_t len) {
             } else {
                 // could grow existing memory
                 MP_STATE_VM(qstr_last_alloc) += n_bytes;
+#ifdef __CHERI_PURE_CAPABILITY__
+                MP_STATE_VM(qstr_last_chunk) = new_p;
+#endif
             }
         }
 

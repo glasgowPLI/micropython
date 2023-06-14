@@ -273,6 +273,9 @@ STATIC void *parser_alloc(parser_t *parser, size_t num_bytes) {
         } else {
             // could grow existing memory
             chunk->alloc += num_bytes;
+#ifdef __CHERI_PURE_CAPABILITY__
+            parser->cur_chunk = chunk = new_data;
+#endif
         }
     }
 
