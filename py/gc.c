@@ -29,6 +29,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheriintrin.h>
+#endif
+
 #include "py/gc.h"
 #include "py/runtime.h"
 
@@ -729,7 +733,11 @@ found:
     gc_dump_alloc_table(&mp_plat_print);
     #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+    return cheri_bounds_set(ret_ptr, n_bytes); 
+#else
     return ret_ptr;
+#endif
 }
 
 /*
@@ -937,7 +945,12 @@ void *gc_realloc(void *ptr_in, size_t n_bytes, bool allow_move) {
     // return original ptr if it already has the requested number of blocks
     if (new_blocks == n_blocks) {
         GC_EXIT();
+#ifdef __CHERI_PURE_CAPABILITY__
+	// May need to widen bounds
+	return cheri_bounds_set(cheri_address_set(area->gc_pool_start, cheri_address_get(ptr_in)), n_bytes);
+#else
         return ptr_in;
+#endif
     }
 
     // check if we can shrink the allocated area
@@ -965,7 +978,11 @@ void *gc_realloc(void *ptr_in, size_t n_bytes, bool allow_move) {
         gc_dump_alloc_table(&mp_plat_print);
         #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	return cheri_bounds_set(ptr_in, n_bytes);
+#else
         return ptr_in;
+#endif
     }
 
     // check if we can expand in place
@@ -977,6 +994,11 @@ void *gc_realloc(void *ptr_in, size_t n_bytes, bool allow_move) {
         }
 
         GC_EXIT();
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	// Temporarily widen capability to allow zero-setting
+	ptr_in = cheri_address_set(area->gc_pool_start, cheri_address_get(ptr_in));
+#endif
 
         #if MICROPY_GC_CONSERVATIVE_CLEAR
         // be conservative and zero out all the newly allocated blocks
@@ -990,7 +1012,11 @@ void *gc_realloc(void *ptr_in, size_t n_bytes, bool allow_move) {
         gc_dump_alloc_table(&mp_plat_print);
         #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	return cheri_bounds_set(ptr_in, n_bytes);
+#else
         return ptr_in;
+#endif
     }
 
     #if MICROPY_ENABLE_FINALISER
@@ -1013,6 +1039,10 @@ void *gc_realloc(void *ptr_in, size_t n_bytes, bool allow_move) {
     if (ptr_out == NULL) {
         return NULL;
     }
+#ifdef __CHERI_PURE_CAPABILITY__
+	// Temporarily widen capability to allow full block copy
+	ptr_in = cheri_address_set(area->gc_pool_start, cheri_address_get(ptr_in));
+#endif
 
     DEBUG_printf("gc_realloc(%p -> %p)\n", ptr_in, ptr_out);
     memcpy(ptr_out, ptr_in, n_blocks * BYTES_PER_BLOCK);
