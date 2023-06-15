@@ -31,6 +31,10 @@
 #include <assert.h>
 #include <string.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheriintrin.h>
+#endif
+
 #include "py/lexer.h"
 #include "py/parse.h"
 #include "py/parsenum.h"
@@ -293,7 +297,11 @@ STATIC void *parser_alloc(parser_t *parser, size_t num_bytes) {
 
     byte *ret = chunk->data + chunk->union_.used;
     chunk->union_.used += num_bytes;
+#ifdef __CHERI_PURE_CAPABILITY__
+    return cheri_bounds_set(ret, num_bytes);
+#else
     return ret;
+#endif
 }
 
 #if MICROPY_COMP_CONST_TUPLE
