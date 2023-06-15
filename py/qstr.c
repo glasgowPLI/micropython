@@ -28,6 +28,10 @@
 #include <string.h>
 #include <stdio.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheriintrin.h>
+#endif
+
 #include "py/mpstate.h"
 #include "py/qstr.h"
 #include "py/gc.h"
@@ -255,6 +259,10 @@ qstr qstr_from_strn(const char *str, size_t len) {
         // allocate memory from the chunk for this new interned string's data
         char *q_ptr = MP_STATE_VM(qstr_last_chunk) + MP_STATE_VM(qstr_last_used);
         MP_STATE_VM(qstr_last_used) += n_bytes;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	q_ptr = cheri_bounds_set(q_ptr, n_bytes);
+#endif
 
         // store the interned strings' data
         size_t hash = qstr_compute_hash((const byte *)str, len);
