@@ -59,7 +59,11 @@ typedef struct _mp_obj_ssl_socket_t {
     mbedtls_x509_crt cert;
     mbedtls_pk_context pkey;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+    uint64_t poll_mask;
+#else
     uintptr_t poll_mask; // Indicates which read or write operations the protocol needs next
+#endif
     int last_error; // The last error code, if any
 } mp_obj_ssl_socket_t;
 
@@ -384,7 +388,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(socket_setblocking_obj, socket_setblocking);
 STATIC mp_uint_t socket_ioctl(mp_obj_t o_in, mp_uint_t request, uintptr_t arg, int *errcode) {
     mp_obj_ssl_socket_t *self = MP_OBJ_TO_PTR(o_in);
     mp_uint_t ret = 0;
-    uintptr_t saved_arg = 0;
+    uint64_t saved_arg = 0;
     mp_obj_t sock = self->sock;
     if (sock == MP_OBJ_NULL || (request != MP_STREAM_CLOSE && self->last_error != 0)) {
         // Closed or error socket:
