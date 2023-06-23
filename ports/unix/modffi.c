@@ -97,6 +97,7 @@ typedef struct _mp_obj_ffifunc_t {
     ffi_type *params[];
 } mp_obj_ffifunc_t;
 
+#ifndef __CHERI_PURE_CAPABILITY__
 typedef struct _mp_obj_fficallback_t {
     mp_obj_base_t base;
     void *func;
@@ -106,12 +107,19 @@ typedef struct _mp_obj_fficallback_t {
     ffi_cif cif;
     ffi_type *params[];
 } mp_obj_fficallback_t;
+#endif
 
 // STATIC const mp_obj_type_t opaque_type;
 STATIC const mp_obj_type_t ffimod_type;
 STATIC const mp_obj_type_t ffifunc_type;
+#ifndef __CHERI_PURE_CAPABILITY__
 STATIC const mp_obj_type_t fficallback_type;
+#endif
 STATIC const mp_obj_type_t ffivar_type;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+extern const mp_obj_type_t mp_type_cap;
+#endif
 
 STATIC ffi_type *char2ffi_type(char c) {
     switch (c) {
@@ -202,6 +210,11 @@ STATIC mp_obj_t return_ffi_value(ffi_union_t *val, char type) {
             return mp_obj_new_int_from_ull(val->Q);
         case 'O':
             return (mp_obj_t)(intptr_t)val->ffi;
+#ifdef __CHERI_PURE_CAPABILITY__
+        case 'P':
+	case 'p':
+	    return mp_obj_new_cap((void*)val->ffi);
+#endif
         default:
             return mp_obj_new_int(val->ffi);
     }
@@ -263,11 +276,16 @@ STATIC mp_obj_t ffimod_func(size_t n_args, const mp_obj_t *args) {
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(ffimod_func_obj, 4, 4, ffimod_func);
 
 STATIC mp_obj_t mod_ffi_func(mp_obj_t rettype, mp_obj_t addr_in, mp_obj_t argtypes) {
+#ifdef __CHERI_PURE_CAPABILITY__
+    void *addr = mp_obj_cap_get(addr_in);
+#else
     void *addr = (void *)MP_OBJ_TO_PTR(mp_obj_int_get_truncated(addr_in));
+#endif
     return make_func(rettype, addr, argtypes);
 }
 MP_DEFINE_CONST_FUN_OBJ_3(mod_ffi_func_obj, mod_ffi_func);
 
+#ifndef __CHERI_PURE_CAPABILITY__
 STATIC void call_py_func(ffi_cif *cif, void *ret, void **args, void *user_data) {
     mp_obj_t pyargs[cif->nargs];
     mp_obj_fficallback_t *o = user_data;
@@ -363,6 +381,7 @@ STATIC mp_obj_t mod_ffi_callback(size_t n_args, const mp_obj_t *pos_args, mp_map
     return MP_OBJ_FROM_PTR(o);
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(mod_ffi_callback_obj, 3, mod_ffi_callback);
+#endif
 
 STATIC mp_obj_t ffimod_var(mp_obj_t self_in, mp_obj_t vartype_in, mp_obj_t symname_in) {
     mp_obj_ffimod_t *self = MP_OBJ_TO_PTR(self_in);
@@ -389,7 +408,11 @@ STATIC mp_obj_t ffimod_addr(mp_obj_t self_in, mp_obj_t symname_in) {
     if (sym == NULL) {
         mp_raise_OSError(MP_ENOENT);
     }
+#ifdef __CHERI_PURE_CAPABILITY__
+    return mp_obj_new_cap(sym);
+#else
     return mp_obj_new_int((uintptr_t)sym);
+#endif
 }
 MP_DEFINE_CONST_FUN_OBJ_2(ffimod_addr_obj, ffimod_addr);
 
@@ -500,6 +523,10 @@ STATIC mp_obj_t ffifunc_call(mp_obj_t self_in, size_t n_args, size_t n_kw, const
         #endif
         } else if (a == mp_const_none) {
             values[i].ffi = 0;
+#ifdef __CHERI_PURE_CAPABILITY__
+	} else if (mp_obj_is_type(a, &mp_type_cap)) {
+            values[i].ffi = (ffi_arg)mp_obj_cap_get(a);
+#endif
         } else if (mp_obj_is_int(a)) {
             values[i] = ffi_int_obj_to_ffi_union(a, *argtype);
         } else if (mp_obj_is_str(a)) {
@@ -513,9 +540,11 @@ STATIC mp_obj_t ffifunc_call(mp_obj_t self_in, size_t n_args, size_t n_kw, const
                 goto error;
             }
             values[i].ffi = (ffi_arg)(intptr_t)bufinfo.buf;
+#ifndef __CHERI_PURE_CAPABILITY__
         } else if (mp_obj_is_type(a, &fficallback_type)) {
             mp_obj_fficallback_t *p = MP_OBJ_TO_PTR(a);
             values[i].ffi = (ffi_arg)(intptr_t)p->func;
+#endif
         } else {
             goto error;
         }
@@ -538,6 +567,7 @@ STATIC MP_DEFINE_CONST_OBJ_TYPE(
     call, ffifunc_call
     );
 
+#ifndef __CHERI_PURE_CAPABILITY__
 // FFI callback for Python function
 
 STATIC void fficallback_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
@@ -564,7 +594,7 @@ STATIC MP_DEFINE_CONST_OBJ_TYPE(
     print, fficallback_print,
     locals_dict, &fficallback_locals_dict
     );
-
+#endif
 // FFI variable
 
 STATIC void ffivar_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
@@ -619,14 +649,20 @@ STATIC mp_obj_t mod_ffi_open(size_t n_args, const mp_obj_t *args) {
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_ffi_open_obj, 1, 2, mod_ffi_open);
 
 STATIC mp_obj_t mod_ffi_as_bytearray(mp_obj_t ptr, mp_obj_t size) {
+#ifdef __CHERI_PURE_CAPABILITY__
+    return mp_obj_new_bytearray_by_ref(mp_obj_int_get_truncated(size), mp_obj_cap_get(ptr));
+#else
     return mp_obj_new_bytearray_by_ref(mp_obj_int_get_truncated(size), (void *)(uintptr_t)mp_obj_int_get_truncated(ptr));
+#endif
 }
 MP_DEFINE_CONST_FUN_OBJ_2(mod_ffi_as_bytearray_obj, mod_ffi_as_bytearray);
 
 STATIC const mp_rom_map_elem_t mp_module_ffi_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_ffi) },
     { MP_ROM_QSTR(MP_QSTR_open), MP_ROM_PTR(&mod_ffi_open_obj) },
+#ifndef __CHERI_PURE_CAPABILITY__
     { MP_ROM_QSTR(MP_QSTR_callback), MP_ROM_PTR(&mod_ffi_callback_obj) },
+#endif
     { MP_ROM_QSTR(MP_QSTR_func), MP_ROM_PTR(&mod_ffi_func_obj) },
     { MP_ROM_QSTR(MP_QSTR_as_bytearray), MP_ROM_PTR(&mod_ffi_as_bytearray_obj) },
 };
