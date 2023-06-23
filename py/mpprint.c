@@ -499,11 +499,9 @@ int mp_vprintf(const mp_print_t *print, const char *fmt, va_list args) {
                     break;
                 }
                 #endif
-                size_t len = strlen(str);
-                if (prec >= 0 && (size_t)prec < len) {
-                    len = prec;
-                }
-                chrs += mp_print_strn(print, str, len, flags, fill, width);
+                size_t len = (prec >= 0) ? strnlen(str, prec) : strlen(str);
+                
+		chrs += mp_print_strn(print, str, len, flags, fill, width);
                 break;
             }
             case 'd': {
