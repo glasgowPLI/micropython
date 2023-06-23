@@ -123,7 +123,7 @@ STATIC mp_obj_t bufwriter_make_new(const mp_obj_type_t *type, size_t n_args, siz
     o->stream = args[0];
     o->alloc = alloc;
     o->len = 0;
-    return o;
+    return MP_OBJ_FROM_PTR(o);
 }
 
 STATIC mp_uint_t bufwriter_write(mp_obj_t self_in, const void *buf, mp_uint_t size, int *errcode) {
