@@ -28,6 +28,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheriintrin.h>
+#endif
+
 #include "py/mpconfig.h"
 #include "py/misc.h"
 #include "py/mpstate.h"
@@ -275,10 +279,10 @@ void m_tracked_free(void *ptr_in) {
 #ifdef __CHERI_PURE_CAPABILITY__
     //Widen bounds by finding the matching pointer in the linked list
     m_tracked_node_t *seek = MP_STATE_VM(m_tracked_head);
-    while (seek != NULL && seek != node) {
+    while (seek != NULL && cheri_address_get(&seek->data[0]) != cheri_address_get(ptr_in)) {
         seek = seek->next;
     }
-    if(seek == node) node = seek;
+    if(cheri_address_get(&seek->data[0]) == cheri_address_get(ptr_in)) node = seek;
 #endif
     #if MICROPY_DEBUG_VERBOSE
     size_t data_bytes;
