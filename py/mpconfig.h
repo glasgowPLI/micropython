@@ -151,7 +151,7 @@
 // Number of bytes in memory allocation/GC block. Any size allocated will be
 // rounded up to be multiples of this.
 #ifndef MICROPY_BYTES_PER_GC_BLOCK
-#define MICROPY_BYTES_PER_GC_BLOCK (4 * MP_BYTES_PER_OBJ_WORD)
+#define MICROPY_BYTES_PER_GC_BLOCK (4 * MP_BYTES_PER_OBJ_T)
 #endif
 
 // Number of words allocated (in BSS) to the GC stack (minimum is 1)
@@ -1825,6 +1825,11 @@ typedef double mp_float_t;
 #ifndef MP_BYTES_PER_OBJ_WORD
 #define MP_BYTES_PER_OBJ_WORD (sizeof(mp_uint_t))
 #endif
+
+#ifndef MP_BYTES_PER_OBJ_T
+#define MP_BYTES_PER_OBJ_T sizeof(mp_obj_t)
+#endif
+
 
 // Number of bits in a byte
 #ifndef MP_BITS_PER_BYTE
