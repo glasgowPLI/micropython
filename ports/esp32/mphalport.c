@@ -32,6 +32,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_timer.h"
 
 #include "py/obj.h"
 #include "py/objstr.h"
@@ -110,10 +111,10 @@ void mp_hal_stdout_tx_strn(const char *str, size_t len) {
     if (release_gil) {
         MP_THREAD_GIL_EXIT();
     }
-    #if CONFIG_USB_ENABLED
-    usb_tx_strn(str, len);
-    #elif CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
+    #if CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG
     usb_serial_jtag_tx_strn(str, len);
+    #elif CONFIG_USB_OTG_SUPPORTED
+    usb_tx_strn(str, len);
     #endif
     #if MICROPY_HW_ENABLE_UART_REPL
     uart_stdout_tx_strn(str, len);
