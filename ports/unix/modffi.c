@@ -39,6 +39,20 @@
 #include <dlfcn.h>
 #include <ffi.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define FFIMOD_STACK_SIZE (16*4096)
+#include <sys/mman.h>
+#include <cheriintrin.h>
+#endif
+
+#ifndef FFI_COMPARTMENTS
+#ifdef __CHERI_PURE_CAPABILITY__
+#define FFI_COMPARTMENTS 1
+#else
+#define FFI_COMPARTMENTS 0
+#endif
+#endif
+
 /*
  * modffi uses character codes to encode a value type, based on "struct"
  * module type codes, with some extensions and overridings.
@@ -79,6 +93,9 @@ typedef struct _mp_obj_opaque_t {
 typedef struct _mp_obj_ffimod_t {
     mp_obj_base_t base;
     void *handle;
+#if FFI_COMPARTMENTS
+    void *stack;
+#endif
 } mp_obj_ffimod_t;
 
 typedef struct _mp_obj_ffivar_t {
@@ -90,6 +107,9 @@ typedef struct _mp_obj_ffivar_t {
 
 typedef struct _mp_obj_ffifunc_t {
     mp_obj_base_t base;
+#if FFI_COMPARTMENTS
+    mp_obj_ffimod_t *parent;
+#endif
     void *func;
     char rettype;
     const char *argtypes;
@@ -231,11 +251,16 @@ STATIC void ffimod_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kin
 STATIC mp_obj_t ffimod_close(mp_obj_t self_in) {
     mp_obj_ffimod_t *self = MP_OBJ_TO_PTR(self_in);
     dlclose(self->handle);
+    munmap(cheri_offset_set(self->stack, 0), cheri_length_get(self->stack));
     return mp_const_none;
 }
 STATIC MP_DEFINE_CONST_FUN_OBJ_1(ffimod_close_obj, ffimod_close);
 
-STATIC mp_obj_t make_func(mp_obj_t rettype_in, void *func, mp_obj_t argtypes_in) {
+STATIC mp_obj_t make_func(mp_obj_t rettype_in, void *func, mp_obj_t argtypes_in
+#if FFI_COMPARTMENTS
+                , mp_obj_ffimod_t *parent
+#endif
+		) {
     const char *rettype = mp_obj_str_get_str(rettype_in);
     const char *argtypes = mp_obj_str_get_str(argtypes_in);
 
@@ -245,6 +270,9 @@ STATIC mp_obj_t make_func(mp_obj_t rettype_in, void *func, mp_obj_t argtypes_in)
     o->func = func;
     o->rettype = *rettype;
     o->argtypes = argtypes;
+#if FFI_COMPARTMENTS
+    o->parent = parent;
+#endif
 
     mp_obj_iter_buf_t iter_buf;
     mp_obj_t iterable = mp_getiter(argtypes_in, &iter_buf);
@@ -271,9 +299,21 @@ STATIC mp_obj_t ffimod_func(size_t n_args, const mp_obj_t *args) {
     if (sym == NULL) {
         mp_raise_OSError(MP_ENOENT);
     }
-    return make_func(args[1], sym, args[3]);
+    return make_func(args[1], sym, args[3]
+#if FFI_COMPARTMENTS
+		    , self
+#endif
+		    );
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(ffimod_func_obj, 4, 4, ffimod_func);
+
+#if FFI_COMPARTMENTS
+STATIC mp_obj_ffimod_t * default_module(void) {
+    static mp_obj_ffimod_t defmod = {{&ffimod_type}, NULL, NULL};
+    if(!defmod.stack) defmod.stack = cheri_offset_set(mmap(NULL, FFIMOD_STACK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0), FFIMOD_STACK_SIZE);
+    return &defmod;
+}
+#endif
 
 STATIC mp_obj_t mod_ffi_func(mp_obj_t rettype, mp_obj_t addr_in, mp_obj_t argtypes) {
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -281,7 +321,11 @@ STATIC mp_obj_t mod_ffi_func(mp_obj_t rettype, mp_obj_t addr_in, mp_obj_t argtyp
 #else
     void *addr = (void *)MP_OBJ_TO_PTR(mp_obj_int_get_truncated(addr_in));
 #endif
-    return make_func(rettype, addr, argtypes);
+    return make_func(rettype, addr, argtypes
+#if FFI_COMPARTMENTS
+		    , default_module()
+#endif
+		    );
 }
 MP_DEFINE_CONST_FUN_OBJ_3(mod_ffi_func_obj, mod_ffi_func);
 
@@ -431,6 +475,7 @@ STATIC mp_obj_t ffimod_make_new(const mp_obj_type_t *type, size_t n_args, size_t
     }
     mp_obj_ffimod_t *o = mp_obj_malloc(mp_obj_ffimod_t, type);
     o->handle = mod;
+    o->stack = cheri_offset_set(mmap(NULL, FFIMOD_STACK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0), FFIMOD_STACK_SIZE);
     return MP_OBJ_FROM_PTR(o);
 }
 
@@ -502,6 +547,116 @@ STATIC ffi_union_t ffi_int_obj_to_ffi_union(mp_obj_t o, const char argtype) {
     return ret;
 }
 
+#if FFI_COMPARTMENTS 
+
+
+/* To be called ONLY through FFI; odd calling convention.
+ * c0 - c9 contain args and return alloc to be transparently passed, or are invalid.
+ * c18 contains the target ffi_func struct pointer */
+__attribute__((naked)) STATIC void ffi_compartment_entry(void) {
+    __asm( 
+        "ldp c10, c11, [c18, #16]\n" // c10 = parent, c11 = func
+        "stp c29, c30, [csp, #-192]!\n"
+	"stp c27, c28, [csp, #32]\n"
+	"stp c25, c26, [csp, #64]\n"
+	"stp c23, c24, [csp, #96]\n"
+	"stp c21, c22, [csp, #128]\n"
+	"stp c19, c20, [csp, #160]\n"
+        "adr c30, 0f+1\n"
+	"seal c30, c30, rb\n"
+	"mov c29, csp\n"
+	"stp c29, c30, [csp, #-32]!\n"
+	"scbnds c29, csp, #32\n"
+	"seal c29, c29, lpb\n"
+	"ldr c10, [c10, #32]\n" // c10 = stack
+	// c10 and c11 hold target stack and entry point -- don't need to be cleared
+	"mov w12, #0\n"
+	"mov w13, #0\n"
+	"mov w14, #0\n"
+	"mov w15, #0\n"
+	"mov w16, #0\n"
+	"mov w17, #0\n"
+	"mov w18, #0\n"
+	"mov w19, #0\n"
+	"mov w20, #0\n"
+	"mov w21, #0\n"
+	"mov w22, #0\n"
+	"mov w23, #0\n"
+	"mov w24, #0\n"
+	"mov w25, #0\n"
+	"mov w26, #0\n"
+	"mov w27, #0\n"
+	"mov w28, #0\n"
+        "mov csp, c10\n"
+	"blr c11\n"
+	"ldpbr c29, [c29]\n"
+     "0: mov csp, c29\n"
+        "ldp c19, c20, [csp, #160]\n"
+        "ldp c21, c22, [csp, #128]\n"
+        "ldp c23, c24, [csp, #96]\n"
+        "ldp c25, c26, [csp, #64]\n"
+        "ldp c27, c28, [csp, #32]\n"
+        "ldp c29, c30, [csp], #192\n"
+	"ret\n"
+    );
+}
+
+#if 0
+/* First attempt -- but exposes libffi internals */
+__attribute__((naked)) STATIC void secure_ffi_call(ffi_cif *cif, void (*fn)(void), void *rvalue, void **avalue, void (*entry)(ffi_cif*,void(*)(void),void*,void**), void * tstack) {
+    __asm( /* c0 : cif, c1 : fn, c2 : rvalue, c3 : avalue (inner arguments)
+	    * c4 : entry, c5 : tstack */
+        "stp c29, c30, [csp, #-192]!\n"
+	"stp c27, c28, [csp, #32]\n"
+	"stp c25, c26, [csp, #64]\n"
+	"stp c23, c24, [csp, #96]\n"
+	"stp c21, c22, [csp, #128]\n"
+	"stp c19, c20, [csp, #160]\n"
+        "adr c30, 0f+1\n"
+	"seal c30, c30, rb\n"
+	"mov c29, csp\n"
+	"stp c29, c30, [csp, #-32]!\n"
+	"scbnds c29, csp, #32\n"
+	"seal c29, c29, lpb\n"
+	"mov w6, #0\n"
+	"mov w7, #0\n"
+	"mov w8, #0\n"
+	"mov w9, #0\n"
+	"mov w10, #0\n"
+	"mov w11, #0\n"
+	"mov w12, #0\n"
+	"mov w13, #0\n"
+	"mov w14, #0\n"
+	"mov w15, #0\n"
+	"mov w16, #0\n"
+	"mov w17, #0\n"
+	"mov w18, #0\n"
+	"mov w19, #0\n"
+	"mov w20, #0\n"
+	"mov w21, #0\n"
+	"mov w22, #0\n"
+	"mov w23, #0\n"
+	"mov w24, #0\n"
+	"mov w25, #0\n"
+	"mov w26, #0\n"
+	"mov w27, #0\n"
+	"mov w28, #0\n"
+        "mov csp, c5\n"
+	"blr c4\n"
+	"ldpbr c29, [c29]\n"
+     "0: mov csp, c29\n"
+        "ldp c19, c20, [csp, #160]\n"
+        "ldp c21, c22, [csp, #128]\n"
+        "ldp c23, c24, [csp, #96]\n"
+        "ldp c25, c26, [csp, #64]\n"
+        "ldp c27, c28, [csp, #32]\n"
+        "ldp c29, c30, [csp], #192\n"
+	"ret"
+    );
+}
+#endif
+#endif
+
 STATIC mp_obj_t ffifunc_call(mp_obj_t self_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     (void)n_kw;
     mp_obj_ffifunc_t *self = MP_OBJ_TO_PTR(self_in);
@@ -552,7 +707,14 @@ STATIC mp_obj_t ffifunc_call(mp_obj_t self_in, size_t n_args, size_t n_kw, const
     }
 
     ffi_union_t retval;
+#if FFI_COMPARTMENTS
+    retval.ffi = (ffi_arg)NULL;
+    /* Hack -- ffi_call_go() allows us to ensure the struct pointer is placed in c18 */
+    ffi_call_go(&self->cif, &ffi_compartment_entry, &retval, valueptrs, self);
+    //secure_ffi_call(&self->cif, self->func, &retval, valueptrs, &ffi_call, self->parent->stack);
+#else
     ffi_call(&self->cif, self->func, &retval, valueptrs);
+#endif
     return return_ffi_value(&retval, self->rettype);
 
 error:
