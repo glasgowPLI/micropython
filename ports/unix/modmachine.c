@@ -70,7 +70,7 @@ uintptr_t mod_machine_mem_get_addr(mp_obj_t addr_o, uint align) {
             map_page = (uintptr_t)mmap(NULL, MICROPY_PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, cur_base);
             last_base = cur_base;
         }
-        addr = map_page + (addr & MICROPY_PAGE_MASK);
+        addr = map_page + ((size_t)addr & MICROPY_PAGE_MASK);
     }
     #endif
 
