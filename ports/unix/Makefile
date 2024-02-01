@@ -33,6 +33,9 @@ QSTR_GLOBAL_DEPENDENCIES += $(VARIANT_DIR)/mpconfigvariant.h
 # OS name, for simple autoconfig
 UNAME_S := $(shell uname -s)
 
+# Processor architecture, for simple autoconfig
+UNAME_P := $(shell uname -p)
+
 # include py core make definitions
 include $(TOP)/py/py.mk
 include $(TOP)/extmod/extmod.mk
@@ -47,6 +50,11 @@ INC += -I$(BUILD)
 CWARN = -Wall -Werror
 CWARN += -Wextra -Wno-unused-parameter -Wpointer-arith -Wdouble-promotion -Wfloat-conversion
 CFLAGS += $(INC) $(CWARN) -std=gnu99 -DUNIX $(COPT) -I$(VARIANT_DIR) $(CFLAGS_EXTRA)
+
+# specific flags for CHERI
+ifeq ($(UNAME_P),aarch64c)
+CFLAGS += -march=morello -mabi=purecap
+endif
 
 # Debugging/Optimization
 ifdef DEBUG
@@ -89,6 +97,15 @@ ifndef DEBUG
 #
 # Turning off _FORTIFY_SOURCE is only required when compiling with -O1 or greater
 CFLAGS += -U _FORTIFY_SOURCE
+endif
+
+# On CheriBSD, use specialized 'clang-morello' compiler
+ifeq ($(UNAME_S),FreeBSD)
+ifeq ($(UNAME_P),aarch64c)
+CC = clang-morello
+# Use clang syntax for map file
+LDFLAGS_ARCH = -Wl,-map,$@.map -Wl,-dead_strip
+endif
 endif
 
 # On OSX, 'gcc' is a symlink to clang unless a real gcc is installed.
