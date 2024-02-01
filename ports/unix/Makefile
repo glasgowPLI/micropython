@@ -54,6 +54,7 @@ CFLAGS += $(INC) $(CWARN) -std=gnu99 -DUNIX $(COPT) -I$(VARIANT_DIR) $(CFLAGS_EX
 # specific flags for CHERI
 ifeq ($(UNAME_P),aarch64c)
 CFLAGS += -march=morello -mabi=purecap
+LDFLAGS += -march=morello -mabi=purecap
 endif
 
 # Debugging/Optimization
