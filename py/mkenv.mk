@@ -29,6 +29,9 @@ else
 Q =
 endif
 
+# Check for processor architecture
+uname_P := $(shell uname -p)
+
 # default settings; can be overridden in main Makefile
 
 PY_SRC ?= $(TOP)/py
@@ -45,7 +48,11 @@ PYTHON = python3
 ZIP = zip
 
 AS = $(CROSS_COMPILE)as
+ifeq ($(uname_P), aarch64c)
+CC = cc
+else
 CC = $(CROSS_COMPILE)gcc
+endif
 CPP = $(CC) -E
 CXX = $(CROSS_COMPILE)g++
 GDB = $(CROSS_COMPILE)gdb
