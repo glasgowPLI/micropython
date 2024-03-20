@@ -39,6 +39,10 @@
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheriintrin.h>
+#endif
+
 // The memory allocated here is not on the GC heap (and it may contain pointers
 // that need to be GC'd) so we must somehow trace this memory.  We do it by
 // keeping a linked list of all mmap'd regions, and tracing them explicitly.
@@ -95,7 +99,13 @@ void ffi_closure_free(void *ptr);
 void *ffi_closure_alloc(size_t size, void **code) {
     size_t dummy;
     mp_unix_alloc_exec(size, code, &dummy);
+#ifdef __CHERI_PURE_CAPABILITY__
+    void * ret = *code;
+    *code = cheri_sentry_create((char*)*code + 1);
+    return ret;
+#else
     return *code;
+#endif
 }
 
 void ffi_closure_free(void *ptr) {
