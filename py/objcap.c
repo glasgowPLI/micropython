@@ -39,13 +39,13 @@ typedef struct _mp_obj_cap_t {
     void * value;
 } mp_obj_cap_t;
 
-STATIC void capability_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
+static void capability_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     (void)kind;
     mp_obj_cap_t *self = MP_OBJ_TO_PTR(self_in);
     mp_printf(print, "%p", self->value);
 }
 
-STATIC mp_obj_t capability_unary_op(mp_unary_op_t op, mp_obj_t self_in) {
+static mp_obj_t capability_unary_op(mp_unary_op_t op, mp_obj_t self_in) {
     mp_obj_cap_t *self = MP_OBJ_TO_PTR(self_in);
     switch (op) {
         case MP_UNARY_OP_BOOL:
@@ -59,7 +59,7 @@ STATIC mp_obj_t capability_unary_op(mp_unary_op_t op, mp_obj_t self_in) {
     }
 }
 
-STATIC mp_obj_t capability_binary_op(mp_binary_op_t op, mp_obj_t lhs_in, mp_obj_t rhs_in) {
+static mp_obj_t capability_binary_op(mp_binary_op_t op, mp_obj_t lhs_in, mp_obj_t rhs_in) {
     mp_obj_cap_t *lhs = MP_OBJ_TO_PTR(lhs_in);
     uintptr_t lhs_val = (uintptr_t)lhs->value;
     mp_int_t rhs_val;
@@ -104,7 +104,7 @@ STATIC mp_obj_t capability_binary_op(mp_binary_op_t op, mp_obj_t lhs_in, mp_obj_
     return mp_obj_new_cap((void*)lhs_val);
 }
 
-STATIC mp_obj_t cap_to_bytes(size_t n_args, const mp_obj_t *args) {
+static mp_obj_t cap_to_bytes(size_t n_args, const mp_obj_t *args) {
     (void)n_args;
     mp_obj_cap_t * self = MP_OBJ_TO_PTR(args[0]);
 
@@ -125,13 +125,13 @@ STATIC mp_obj_t cap_to_bytes(size_t n_args, const mp_obj_t *args) {
 
     return mp_obj_new_bytes_from_vstr(&vstr);
 }
-STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(cap_to_bytes_obj, 3, 4, cap_to_bytes);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(cap_to_bytes_obj, 3, 4, cap_to_bytes);
 
-STATIC const mp_rom_map_elem_t cap_locals_dict_table[] = {
+static const mp_rom_map_elem_t cap_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_to_bytes), MP_ROM_PTR(&cap_to_bytes_obj) },
 };
 
-STATIC MP_DEFINE_CONST_DICT(cap_locals_dict, cap_locals_dict_table);
+static MP_DEFINE_CONST_DICT(cap_locals_dict, cap_locals_dict_table);
 
 MP_DEFINE_CONST_OBJ_TYPE(
     mp_type_cap, MP_QSTR_cap, MP_TYPE_FLAG_EQ_CHECKS_OTHER_TYPE,

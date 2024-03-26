@@ -42,7 +42,7 @@
 // stack already by the caller.
 #if defined(__x86_64__)
 
-STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
+static void gc_helper_get_regs(gc_helper_regs_t arr) {
     register long rbx asm ("rbx");
     register long rbp asm ("rbp");
     register long r12 asm ("r12");
@@ -73,7 +73,7 @@ STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
 
 #elif defined(__i386__)
 
-STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
+static void gc_helper_get_regs(gc_helper_regs_t arr) {
     register long ebx asm ("ebx");
     register long esi asm ("esi");
     register long edi asm ("edi");
@@ -100,7 +100,7 @@ STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
 
 // Fallback implementation, prefer gchelper_thumb1.s or gchelper_thumb2.s
 
-STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
+static void gc_helper_get_regs(gc_helper_regs_t arr) {
     register long r4 asm ("r4");
     register long r5 asm ("r5");
     register long r6 asm ("r6");
@@ -128,7 +128,7 @@ STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
 #if defined(__ARM_FEATURE_C64)
 // Morello
 
-STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
+static void gc_helper_get_regs(gc_helper_regs_t arr) {
     const register uintptr_t c19 asm ("c19");
     const register uintptr_t c20 asm ("c20");
     const register uintptr_t c21 asm ("c21");
@@ -156,7 +156,7 @@ STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
 
 #else
 
-STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
+static void gc_helper_get_regs(gc_helper_regs_t arr) {
     const register long x19 asm ("x19");
     const register long x20 asm ("x20");
     const register long x21 asm ("x21");
@@ -194,7 +194,7 @@ STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
 // Even if we have specific support for an architecture, it is
 // possible to force use of setjmp-based implementation.
 
-STATIC void gc_helper_get_regs(gc_helper_regs_t arr) {
+static void gc_helper_get_regs(gc_helper_regs_t arr) {
     setjmp(arr);
 }
 

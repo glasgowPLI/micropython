@@ -56,15 +56,6 @@ Functions
     two most useful ones are predefined as `esp32.HEAP_DATA` for data heap regions and
     `esp32.HEAP_EXEC` for executable regions as used by the native code emitter.
 
-    Free IDF heap memory in the `esp32.HEAP_DATA` region is available to be
-    automatically added to the MicroPython heap to prevent a MicroPython
-    allocation from failing. However, the information returned here is otherwise
-    *not* useful to troubleshoot Python allocation failures, use
-    `micropython.mem_info()` instead. The "max new split" value in
-    `micropython.mem_info()` output corresponds to the largest free block of
-    ESP-IDF heap that could be automatically added on demand to the MicroPython
-    heap.
-
     The return value is a list of 4-tuples, where each 4-tuple corresponds to one heap
     and contains: the total bytes, the free bytes, the largest free block, and
     the minimum free seen over time.
@@ -74,6 +65,21 @@ Functions
         >>> import esp32; esp32.idf_heap_info(esp32.HEAP_DATA)
         [(240, 0, 0, 0), (7288, 0, 0, 0), (16648, 4, 4, 4), (79912, 35712, 35512, 35108),
          (15072, 15036, 15036, 15036), (113840, 0, 0, 0)]
+
+    .. note:: Free IDF heap memory in the `esp32.HEAP_DATA` region is available
+       to be automatically added to the MicroPython heap to prevent a
+       MicroPython allocation from failing. However, the information returned
+       here is otherwise *not* useful to troubleshoot Python allocation
+       failures. :func:`micropython.mem_info()` and :func:`gc.mem_free()` should
+       be used instead:
+
+       The "max new split" value in :func:`micropython.mem_info()` output
+       corresponds to the largest free block of ESP-IDF heap that could be
+       automatically added on demand to the MicroPython heap.
+
+       The result of :func:`gc.mem_free()` is the total of the current "free"
+       and "max new split" values printed by :func:`micropython.mem_info()`.
+
 
 Flash partitions
 ----------------
@@ -108,11 +114,16 @@ methods to enable over-the-air (OTA) updates.
 
     These methods implement the simple and :ref:`extended
     <block-device-interface>` block protocol defined by
-    :class:`os.AbstractBlockDev`.
+    :class:`vfs.AbstractBlockDev`.
 
 .. method:: Partition.set_boot()
 
     Sets the partition as the boot partition.
+
+    .. note:: Do not enter :func:`deepsleep<machine.deepsleep>` after changing
+       the OTA boot partition, without first performing a hard
+       :func:`reset<machine.reset>` or power cycle. This ensures the bootloader
+       will validate the new image before booting.
 
 .. method:: Partition.get_next_update()
 
@@ -182,7 +193,7 @@ numbers specified in ``write_pulses`` are multiplied by the resolution to
 define the pulses.
 
 ``clock_div`` is an 8-bit divider (0-255) and each pulse can be defined by
-multiplying the resolution by a 15-bit (0-32,768) number. There are eight
+multiplying the resolution by a 15-bit (1-``PULSE_MAX``) number. There are eight
 channels (0-7) and each can have a different clock divider.
 
 So, in the example above, the 80MHz clock is divided by 8. Thus the
@@ -215,7 +226,7 @@ For more details see Espressif's `ESP-IDF RMT documentation.
     ``100``) and the output level to apply the carrier to (a boolean as per
     *idle_level*).
 
-.. method:: RMT.source_freq()
+.. classmethod:: RMT.source_freq()
 
     Returns the source clock frequency. Currently the source clock is not
     configurable so this will always return 80MHz.
@@ -253,10 +264,10 @@ For more details see Espressif's `ESP-IDF RMT documentation.
     **Mode 3:** *duration* and *data* are lists or tuples of equal length,
     specifying individual durations and the output level for each.
 
-    Durations are in integer units of the channel resolution (as described
-    above), between 1 and 32767 units. Output levels are any value that can
-    be converted to a boolean, with ``True`` representing high voltage and
-    ``False`` representing low.
+    Durations are in integer units of the channel resolution (as
+    described above), between 1 and ``PULSE_MAX`` units. Output levels
+    are any value that can be converted to a boolean, with ``True``
+    representing high voltage and ``False`` representing low.
 
     If transmission of an earlier sequence is in progress then this method will
     block until that transmission is complete before beginning the new sequence.
@@ -278,6 +289,13 @@ For more details see Espressif's `ESP-IDF RMT documentation.
 
     Passing in no argument will not change the channel.  This function returns
     the current channel number.
+
+Constants
+---------
+
+.. data:: RMT.PULSE_MAX
+
+   Maximum integer that can be set for a pulse duration.
 
 Ultra-Low-Power co-processor
 ----------------------------
