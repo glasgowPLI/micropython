@@ -154,7 +154,7 @@ void * mp_obj_cap_get(mp_obj_t self_in) {
         return self->value;
     } else {
 	// allow integer objects to appear as tagless pointers, in particular for NULLs
-	return (void*)(uintptr_t)mp_obj_int_get_truncated(self_in);
+	return (void*)(uintptr_t)mp_obj_get_int_truncated(self_in);
     }
 }
 
