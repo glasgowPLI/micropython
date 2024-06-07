@@ -554,8 +554,8 @@ raw_repl_reset:
     }
 }
 
+static vstr_t line;
 int pyexec_friendly_repl(void) {
-    vstr_t line;
     vstr_init(&line, 32);
 
 friendly_repl_reset:

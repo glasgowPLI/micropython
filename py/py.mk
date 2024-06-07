@@ -81,6 +81,7 @@ PY_CORE_O_BASENAME = $(addprefix py/,\
 	nlrthumb.o \
 	nlraarch64.o \
 	nlrmorello.o \
+	nlrcheriot.o \
 	nlrmips.o \
 	nlrpowerpc.o \
 	nlrxtensa.o \

@@ -44,6 +44,7 @@
 #define MICROPY_NLR_NUM_REGS_MIPS           (13)
 #define MICROPY_NLR_NUM_REGS_XTENSA         (10)
 #define MICROPY_NLR_NUM_REGS_XTENSAWIN      (17)
+#define MICROPY_NLR_NUM_REGS_CHERIOT        (5)
 
 // *FORMAT-OFF*
 
@@ -92,6 +93,9 @@
 #elif defined(__mips__)
     #define MICROPY_NLR_MIPS (1)
     #define MICROPY_NLR_NUM_REGS (MICROPY_NLR_NUM_REGS_MIPS)
+#elif defined(CHERIOT_IBEX)
+    #define MICROPY_NLR_CHERIOT (1)
+    #define MICROPY_NLR_NUM_REGS (MICROPY_NLR_NUM_REGS_CHERIOT)
 #else
     #define MICROPY_NLR_SETJMP (1)
     //#warning "No native NLR support for this arch, using setjmp implementation"

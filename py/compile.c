@@ -3468,8 +3468,10 @@ static
 #endif
 void mp_compile_to_raw_code(mp_parse_tree_t *parse_tree, qstr source_file, bool is_repl, mp_compiled_module_t *cm) {
     // put compiler state on the stack, it's relatively small
-    compiler_t comp_state = {0};
-    compiler_t *comp = &comp_state;
+    // compiler_t comp_state = {0};
+    // compiler_t *comp = &comp_state;
+    // No -- dynamically allocate on CHERIoT to avoid tag loss when stored in a global
+    compiler_t *comp = m_new0(compiler_t, 1);
 
     comp->is_repl = is_repl;
     comp->break_label = INVALID_LABEL;
@@ -3666,6 +3668,7 @@ void mp_compile_to_raw_code(mp_parse_tree_t *parse_tree, qstr source_file, bool 
     if (comp->compile_error != MP_OBJ_NULL) {
         nlr_raise(comp->compile_error);
     }
+    m_del_obj(compiler_t, comp);
 }
 
 mp_obj_t mp_compile(mp_parse_tree_t *parse_tree, qstr source_file, bool is_repl) {

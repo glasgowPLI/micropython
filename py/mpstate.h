@@ -307,7 +307,29 @@ extern mp_state_ctx_t mp_state_ctx;
 
 #define MP_STATE_VM(x) (mp_state_ctx.vm.x)
 #define MP_STATE_MEM(x) (mp_state_ctx.mem.x)
+
+#ifdef MICROPY_PY_STATE_THREAD_HACK
+/* Hack to avoid issues with global storage of local capabilities on CHERIoT */
+#define MP_STATE_MAIN_THREAD(x) (({ \
+		    mp_state_thread_t * tstate; \
+		    __asm__("cmove %0, ctp" : "=C" (tstate) : : ); \
+		    tstate; \
+		})->x)
+
+#define MP_STATE_THREAD_HACK_INIT mp_state_thread_t thread_state_hack = {0}; \
+	                          __asm__("cmove ctp, %0" : : "C" (&thread_state_hack) : );
+#define MP_STATE_THREAD_HACK_SPILL_FOR(stat) ({ \
+		   const mp_state_thread_t * tstate; \
+		   __asm__("cmove %0, ctp" : "=C" (tstate) : : ); \
+		   stat; \
+		   __asm__("cmove ctp, %0" : : "C" (tstate) : ); \
+                })
+
+#else
+#define MP_STATE_THREAD_HACK_INIT
+#define MP_STATE_THREAD_HACK_SPILL_FOR(stat) stat
 #define MP_STATE_MAIN_THREAD(x) (mp_state_ctx.thread.x)
+#endif
 
 #if MICROPY_PY_THREAD
 #define MP_STATE_THREAD(x) (mp_thread_get_state()->x)
