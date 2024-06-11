@@ -22,7 +22,7 @@ To build, run the following (replacing `/path/to/xxx` with the relevant path on 
 
 ## Deploying MicroPython on the Sonata board
 
-Follow the instructions under 'Main persistent flow' at (Sonata v0.2)[https://github.com/lowRISC/sonata-system/releases/tag/v0.2], then drag the `build/micropython.uf2` file into the `SONATA`  drive.
+Follow the instructions under 'Main persistent flow' at [Sonata v0.2](https://github.com/lowRISC/sonata-system/releases/tag/v0.2), then drag the `build/micropython.uf2` file into the `SONATA`  drive.
 
 The MicroPython interpreter can then be accessed over the UART interface:
     $ sudo minicom -c on -D /dev/ttyUSB2
