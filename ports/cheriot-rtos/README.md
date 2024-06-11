@@ -1,47 +1,31 @@
-# The minimal port
+# The cheriot-rtos port
 
-This port is intended to be a minimal MicroPython port that actually runs.
-It can run under Linux (or similar) and on any STM32F4xx MCU (eg the pyboard).
+This is a port for CHERIoT systems, currently configured for the lowRISC Sonata board.
 
-## Building and running Linux version
+## Building MicroPython for CHERIoT
 
-By default the port will be built for the host machine:
+The following dependencies are required to build this port:
 
-    $ make
+- [LLVM for CHERIoT](https://github.com/CHERIoT-Platform/llvm-project)
+- [CHERIoT RTOS](https://github.com/microsoft/cheriot-rtos)
+- Python 3
+- `make`
+- `uf2conv` (Can be installed through `cargo`)
 
-To run the executable and get a basic working REPL do:
+To build, run the following (replacing `/path/to/xxx` with the relevant path on your system):
 
-    $ make run
+    $ make CLLVM_DIR=/path/to/cheriot-llvm CRTOS_DIR=/path/to/cheriot-rtos UF2CONV=/path/to/uf2conv
 
-## Building for an STM32 MCU
+- `CLLVM_DIR` should point to the parent directory of the `bin/` directory holding the CHERIoT llvm binaries.
+- `CRTOS_DIR` should point to the root of the CHERIoT RTOS git repository.
+- `UF2CONV` should point to the `uf2conv` executable.
 
-The Makefile has the ability to build for a Cortex-M CPU, and by default
-includes some start-up code for an STM32F4xx MCU and also enables a UART
-for communication.  To build:
+## Deploying MicroPython on the Sonata board
 
-    $ make CROSS=1
+Follow the instructions under 'Main persistent flow' at (Sonata v0.2)[https://github.com/lowRISC/sonata-system/releases/tag/v0.2], then drag the `build/micropython.uf2` file into the `SONATA`  drive.
 
-If you previously built the Linux version, you will need to first run
-`make clean` to get rid of incompatible object files.
+The MicroPython interpreter can then be accessed over the UART interface:
+    $ sudo minicom -c on -D /dev/ttyUSB2
 
-Building will produce the build/firmware.dfu file which can be programmed
-to an MCU using:
+In order to demonstrate the different MicroPython VM compartment entry points, a REPL is not automatically launched. Instead, press `r` to launch a REPL, `s` to execute the test string, `f` to load the test frozen module, or `q` to exit.
 
-    $ make CROSS=1 deploy
-
-This version of the build will work out-of-the-box on a pyboard (and
-anything similar), and will give you a MicroPython REPL on UART1 at 9600
-baud.  Pin PA13 will also be driven high, and this turns on the red LED on
-the pyboard.
-
-## Building without the built-in MicroPython compiler
-
-This minimal port can be built with the built-in MicroPython compiler
-disabled.  This will reduce the firmware by about 20k on a Thumb2 machine,
-and by about 40k on 32-bit x86.  Without the compiler the REPL will be
-disabled, but pre-compiled scripts can still be executed.
-
-To test out this feature, change the `MICROPY_ENABLE_COMPILER` config
-option to "0" in the mpconfigport.h file in this directory.  Then
-recompile and run the firmware and it will execute the frozentest.py
-file.

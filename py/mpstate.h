@@ -317,8 +317,19 @@ extern mp_state_ctx_t mp_state_ctx;
 		})->x)
 
 #define MP_STATE_THREAD_HACK_INIT mp_state_thread_t thread_state_hack = {0}; \
+		                  thread_state_hack.stack_top = (void*)&thread_state_hack; \
+                                  thread_state_hack.mp_pending_exception = MP_OBJ_NULL; \
+                                  thread_state_hack.dict_globals = &MP_STATE_VM(dict_main); \
+                                  thread_state_hack.dict_locals = &MP_STATE_VM(dict_main); \
 	                          __asm__("cmove ctp, %0" : : "C" (&thread_state_hack) : );
-#define MP_STATE_THREAD_HACK_SPILL_FOR(stat) ({ \
+#define MP_STATE_THREAD_HACK_SPILL_FOR(stat, type) ({ \
+		   const mp_state_thread_t * tstate; \
+		   __asm__("cmove %0, ctp" : "=C" (tstate) : : ); \
+		   type tmp = stat; \
+		   __asm__("cmove ctp, %0" : : "C" (tstate) : ); \
+		   tmp; \
+                })
+#define MP_STATE_THREAD_HACK_SPILL_FOR_V(stat) ({ \
 		   const mp_state_thread_t * tstate; \
 		   __asm__("cmove %0, ctp" : "=C" (tstate) : : ); \
 		   stat; \

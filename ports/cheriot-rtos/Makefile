@@ -1,7 +1,5 @@
 include ../../py/mkenv.mk
 
-CROSS = 0
-
 # qstr definitions (must come before including py.mk)
 QSTR_DEFS = qstrdefsport.h
 
@@ -13,6 +11,7 @@ include $(TOP)/py/py.mk
 
 CLLVM_DIR ?= ~/cheriot-llvm/
 CRTOS_DIR ?= ../../../cheriot-rtos
+UF2CONV ?= ~/.cargo/bin/uf2conv
 
 CROSS_COMPILE = $(CLLVM_DIR)bin/
 AS = $(CROSS_COMPILE)clang
@@ -28,7 +27,7 @@ INC += -I$(BUILD)
 
 INC += $(SYS_INC)
 CFLAGS_CHERIOT_A7 =  -target riscv32-unknown-unknown -mcpu=cheriot -mabi=cheriot -mxcheri-rvc -mrelax -ffunction-sections -fdata-sections -fomit-frame-pointer -fno-builtin -fno-exceptions -fno-asynchronous-unwind-tables -fno-c++-static-destructors -fno-rtti 
-CFLAGS += $(INC) -Wall -Werror -std=c99 -nostdlib $(CFLAGS_CHERIOT_A7) $(COPT) -DNO_ALLOCA_H -DCHERIOT_IBEX -DIBEX -DSUNBURST -DSUNBURST_SHADOW_BASE=0x30000000 -DSUNBURST_SHADOW_SIZE=0x4000 -DCPU_TIMER_HZ=33000000 -DTICK_RATE_HZ=100 -DCHERIOT_NO_AMBIENT_MALLOC -DDEVICE_EXISTS_shadow -DDEVICE_EXISTS_clint -DDEVICE_EXISTS_uart -DDEVICE_EXISTS_gpio -DDEVICE_EXISTS_gpio -DDEVICE_EXISTS_plic -DREVOKABLE_MEMORY_START=0x00100080 -cheri-compartment=mp_main
+CFLAGS += $(INC) -Wall -Werror -std=c99 -nostdlib $(CFLAGS_CHERIOT_A7) $(COPT) -DNO_ALLOCA_H -DCHERIOT_IBEX -DIBEX -DSUNBURST -DSUNBURST_SHADOW_BASE=0x30000000 -DSUNBURST_SHADOW_SIZE=0x4000 -DCPU_TIMER_HZ=33000000 -DTICK_RATE_HZ=100 -DCHERIOT_NO_AMBIENT_MALLOC -DDEVICE_EXISTS_shadow -DDEVICE_EXISTS_clint -DDEVICE_EXISTS_uart -DDEVICE_EXISTS_gpio -DDEVICE_EXISTS_gpio -DDEVICE_EXISTS_plic -DREVOKABLE_MEMORY_START=0x00100080
 LDFLAGS += --script=cheriot-a7-100t.ld --relax
 
 CSUPEROPT = -Os # save some code space
@@ -39,7 +38,6 @@ ifeq ($(DEBUG), 1)
 CFLAGS += -O0
 else
 CFLAGS += -Os -DNDEBUG
-CFLAGS += -fdata-sections -ffunction-sections
 endif
 
 # Flags for optional C++ source code
@@ -47,23 +45,39 @@ CXXFLAGS += $(filter-out -std=c99,$(CFLAGS)) -std=c++20
 
 LIBS =
 
-SRC_C = \
-	main.c \
-	shared/libc/printf.c \
+SRC_C = mp_entry.c \
 	shared/readline/readline.c \
 	shared/runtime/pyexec.c \
-	shared/runtime/stdout_helpers.c \
 	$(BUILD)/_frozen_mpy.c \
 
-SRC_CXX = uart_core.cpp
+SRC_CXX =
 
 SRC_QSTR += shared/readline/readline.c shared/runtime/pyexec.c
+
+SRC_HAL_C = shared/runtime/stdout_helpers.c
+SRC_HAL_CXX = uart_core.cpp
+	
+SRC_MAIN_C = main.c
+SRC_MAIN_CXX = 
 
 OBJ += $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_CXX:.cpp=.o))
 OBJ += $(PY_CORE_O)
 
+OBJ_HAL += $(addprefix $(BUILD)/, $(SRC_HAL_C:.c=.o))
+OBJ_HAL += $(addprefix $(BUILD)/, $(SRC_HAL_CXX:.cpp=.o))
+
+OBJ_MAIN += $(addprefix $(BUILD)/, $(SRC_MAIN_C:.c=.o))
+OBJ_MAIN += $(addprefix $(BUILD)/, $(SRC_MAINL_CXX:.cpp=.o))
+
+$(OBJ): CFLAGS += -DMP_VM_COMP -cheri-compartment=mp_vm
+$(OBJ_HAL): CFLAGS += -cheri-compartment=mp_hal
+$(OBJ_MAIN): CFLAGS += -cheri-compartment=main
+
 all: $(BUILD)/micropython.uf2
+
+all_objects : $(OBJ) $(OBJ_HAL) $(OBJ_MAIN)
+.PHONY: all all_objects
 
 $(BUILD)/_frozen_mpy.c: $(TOP)/tests/frozen/frozentest.mpy $(BUILD)/genhdr/qstrdefs.generated.h
 	$(ECHO) "MISC freezing bytecode"
@@ -71,10 +85,15 @@ $(BUILD)/_frozen_mpy.c: $(TOP)/tests/frozen/frozentest.mpy $(BUILD)/genhdr/qstrd
 
 $(BUILD)/xmake.lua: xmake.lua.top xmake.lua.bottom 
 	cat xmake.lua.top > $@
+	echo "compartment(\"mp_vm\")" >> $@
 	for OFILE in $(patsubst $(BUILD)/%,%,$(OBJ)) ; do echo "    add_files(\"$$OFILE\", {rule = \"utils.merge.object\"})" >> $@ ; done
+	echo "compartment(\"mp_hal\")" >> $@
+	for OFILE in $(patsubst $(BUILD)/%,%,$(OBJ_HAL)) ; do echo "    add_files(\"$$OFILE\", {rule = \"utils.merge.object\"})" >> $@ ; done
+	echo "compartment(\"main\")" >> $@
+	for OFILE in $(patsubst $(BUILD)/%,%,$(OBJ_MAIN)) ; do echo "    add_files(\"$$OFILE\", {rule = \"utils.merge.object\"})" >> $@ ; done
 	cat xmake.lua.bottom >> $@
 
-$(BUILD)/build/cheriot/cheriot/release/micropython: $(OBJ) $(BUILD)/xmake.lua
+$(BUILD)/build/cheriot/cheriot/release/micropython: all_objects $(BUILD)/xmake.lua
 	cd $(BUILD) && xmake config --sdk=$(CLLVM_DIR) --board=sonata && xmake 
 
 #$(BUILD)/cpu0_iram.vhx: $(BUILD)/build/cheriot/cheriot/release/micropython
@@ -85,6 +104,6 @@ $(BUILD)/micropython.bin: $(BUILD)/build/cheriot/cheriot/release/micropython
 	$(CLLVM_DIR)/bin/llvm-objcopy -O binary $< $@
 
 $(BUILD)/micropython.uf2: $(BUILD)/micropython.bin
-	~/.cargo/bin/uf2conv $< --base 0x00101000 --output $@
+	$(UF2CONV) $< --base 0x00101000 --output $@
 
 include $(TOP)/py/mkrules.mk

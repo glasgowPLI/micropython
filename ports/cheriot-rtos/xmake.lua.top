@@ -9,4 +9,3 @@ includes(path.join(sdkdir, "lib"))
 option("board")
     set_default("sonata")
 
-compartment("mp_main")

@@ -2,15 +2,16 @@
 firmware("micropython")
     add_deps("freestanding", "debug")
     add_deps("string", "stdio")
-    add_deps("mp_main")
+    add_deps("mp_vm", "mp_hal")
+    add_deps("main")
     on_load(function(target)
         target:values_set("board", "$(board)")
         target:values_set("threads", {
             {
-                compartment = "mp_main",
+                compartment = "main",
                 priority = 1,
-                entry_point = "mp_main",
-                stack_size = 0x800,
+                entry_point = "entry",
+                stack_size = 0x1f00,
                 trusted_stack_frames = 4
             }
         }, {expand = false})
