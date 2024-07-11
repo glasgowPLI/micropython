@@ -168,7 +168,11 @@ struct _nlr_jump_callback_node_t {
 // For this case it is safe to call nlr_push_tail() first.
 #define nlr_push(buf) (nlr_push_tail(buf), setjmp((buf)->jmpbuf))
 #else
-unsigned int nlr_push(nlr_buf_t *);
+#ifndef RETURN_TWICE
+#define RETURN_TWICE
+#endif
+
+RETURN_TWICE unsigned int nlr_push(nlr_buf_t *);
 #endif
 
 unsigned int nlr_push_tail(nlr_buf_t *top);

@@ -107,7 +107,7 @@ typedef struct _readline_t {
     const char *prompt;
 } readline_t;
 
-static readline_t rl;
+#define rl (*MP_STATE_VM(readline_rl))
 
 #if MICROPY_REPL_EMACS_WORDS_MOVE
 static size_t cursor_count_word(int forward) {
@@ -537,6 +537,7 @@ void readline_note_newline(const char *prompt) {
 }
 
 void readline_init(vstr_t *line, const char *prompt) {
+    if(!MP_STATE_VM(readline_rl)) MP_STATE_VM(readline_rl) = m_new0(readline_t, 1);
     rl.line = line;
     rl.orig_line_len = line->len;
     rl.escape_seq = ESEQ_NONE;
@@ -582,3 +583,4 @@ void readline_push_history(const char *line) {
 }
 
 MP_REGISTER_ROOT_POINTER(const char *readline_hist[MICROPY_READLINE_HISTORY_SIZE]);
+MP_REGISTER_ROOT_POINTER(struct _readline_t *readline_rl);

@@ -57,7 +57,11 @@
 
 const mp_obj_module_t mp_module___main__ = {
     .base = { &mp_type_module },
+#ifdef MICROPY_PY_STATE_THREAD_HACK
+    .globals = (mp_obj_dict_t *)&mp_const_empty_dict_obj,//&MP_STATE_VM(dict_main), XXX FIXME how do we point to the VM state?
+#else
     .globals = (mp_obj_dict_t *)&MP_STATE_VM(dict_main),
+#endif
 };
 
 MP_REGISTER_MODULE(MP_QSTR___main__, mp_module___main__);

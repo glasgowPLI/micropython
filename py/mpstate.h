@@ -293,6 +293,9 @@ typedef struct _mp_state_thread_t {
     bool prof_callback_is_executing;
     struct _mp_code_state_t *current_code_state;
     #endif
+    #ifdef MICROPY_PY_STATE_THREAD_HACK
+    struct _mp_state_ctx_t *context;
+    #endif
 } mp_state_thread_t;
 
 // This structure combines the above 3 structures.
@@ -303,11 +306,6 @@ typedef struct _mp_state_ctx_t {
     mp_state_mem_t mem;
 } mp_state_ctx_t;
 
-extern mp_state_ctx_t mp_state_ctx;
-
-#define MP_STATE_VM(x) (mp_state_ctx.vm.x)
-#define MP_STATE_MEM(x) (mp_state_ctx.mem.x)
-
 #ifdef MICROPY_PY_STATE_THREAD_HACK
 /* Hack to avoid issues with global storage of local capabilities on CHERIoT */
 #define MP_STATE_MAIN_THREAD(x) (({ \
@@ -315,13 +313,17 @@ extern mp_state_ctx_t mp_state_ctx;
 		    __asm__("cmove %0, ctp" : "=C" (tstate) : : ); \
 		    tstate; \
 		})->x)
+#define MP_STATE_VM(x) (MP_STATE_MAIN_THREAD(context)->vm.x)
+#define MP_STATE_MEM(x) (MP_STATE_MAIN_THREAD(context)->mem.x)
+#define mp_state_ctx (*MP_STATE_MAIN_THREAD(context))
 
-#define MP_STATE_THREAD_HACK_INIT mp_state_thread_t thread_state_hack = {0}; \
-		                  thread_state_hack.stack_top = (void*)&thread_state_hack; \
-                                  thread_state_hack.mp_pending_exception = MP_OBJ_NULL; \
-                                  thread_state_hack.dict_globals = &MP_STATE_VM(dict_main); \
-                                  thread_state_hack.dict_locals = &MP_STATE_VM(dict_main); \
-	                          __asm__("cmove ctp, %0" : : "C" (&thread_state_hack) : );
+#define MP_STATE_THREAD_HACK_INIT(ctx) mp_state_thread_t thread_state_hack = {0}; \
+		                       thread_state_hack.stack_top = (void*)&thread_state_hack; \
+                                       thread_state_hack.mp_pending_exception = MP_OBJ_NULL; \
+                                       thread_state_hack.context = ctx; \
+                                       thread_state_hack.dict_globals = &thread_state_hack.context->vm.dict_main; \
+                                       thread_state_hack.dict_locals = &thread_state_hack.context->vm.dict_main; \
+	                               __asm__("cmove ctp, %0" : : "C" (&thread_state_hack) : );
 #define MP_STATE_THREAD_HACK_SPILL_FOR(stat, type) ({ \
 		   const mp_state_thread_t * tstate; \
 		   __asm__("cmove %0, ctp" : "=C" (tstate) : : ); \
@@ -337,7 +339,12 @@ extern mp_state_ctx_t mp_state_ctx;
                 })
 
 #else
-#define MP_STATE_THREAD_HACK_INIT
+extern mp_state_ctx_t mp_state_ctx;
+
+#define MP_STATE_VM(x) (mp_state_ctx.vm.x)
+#define MP_STATE_MEM(x) (mp_state_ctx.mem.x)
+
+#define MP_STATE_THREAD_HACK_INIT(ctx)
 #define MP_STATE_THREAD_HACK_SPILL_FOR(stat) stat
 #define MP_STATE_MAIN_THREAD(x) (mp_state_ctx.thread.x)
 #endif

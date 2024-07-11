@@ -1,9 +1,14 @@
+#ifndef MP_CONFIG_PORT_H
+#define MP_CONFIG_PORT_H
+
 #include <stdint.h>
+
+#define RETURN_TWICE [[gnu::returns_twice]]
 
 // options to control how MicroPython is built
 
 // Use the minimal starting configuration (disables all optional features).
-#define MICROPY_CONFIG_ROM_LEVEL (MICROPY_CONFIG_ROM_LEVEL_MINIMUM)
+#define MICROPY_CONFIG_ROM_LEVEL (MICROPY_CONFIG_ROM_LEVEL_CORE_FEATURES) //MINIMUM)
 
 // You can disable the built-in MicroPython compiler by setting the following
 // config option to 0.  If you do this then you won't get a REPL prompt, but you
@@ -15,6 +20,15 @@
 #define MICROPY_HELPER_REPL               (1)
 #define MICROPY_MODULE_FROZEN_MPY         (1)
 #define MICROPY_ENABLE_EXTERNAL_IMPORT    (1)
+#define MICROPY_PY_SYS			  (1)
+#define MICROPY_PY_SYS_MAXSIZE		  (1)
+#define SSIZE_MAX INT_MAX
+#define MICROPY_PY_SYS_ARGV		  (0)
+#define MICROPY_PY_SYS_MODULES		  (0)
+#define MICROPY_PY_IO			  (0)
+#define MICROPY_PY_BUILTINS_MEMORYVIEW    (1)
+
+#define MICROPY_LONGINT_IMPL        (MICROPY_LONGINT_IMPL_MPZ)
 
 #define MICROPY_ALLOC_PATH_MAX            (256)
 
@@ -46,3 +60,4 @@ static  __attribute__((unused)) __attribute__((always_inline)) size_t strnlen(co
 
 #define MP_STATE_PORT MP_STATE_VM
 
+#endif

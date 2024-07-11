@@ -27,7 +27,7 @@ INC += -I$(BUILD)
 
 INC += $(SYS_INC)
 CFLAGS_CHERIOT_A7 =  -target riscv32-unknown-unknown -mcpu=cheriot -mabi=cheriot -mxcheri-rvc -mrelax -ffunction-sections -fdata-sections -fomit-frame-pointer -fno-builtin -fno-exceptions -fno-asynchronous-unwind-tables -fno-c++-static-destructors -fno-rtti 
-CFLAGS += $(INC) -Wall -Werror -std=c99 -nostdlib $(CFLAGS_CHERIOT_A7) $(COPT) -DNO_ALLOCA_H -DCHERIOT_IBEX -DIBEX -DSUNBURST -DSUNBURST_SHADOW_BASE=0x30000000 -DSUNBURST_SHADOW_SIZE=0x4000 -DCPU_TIMER_HZ=33000000 -DTICK_RATE_HZ=100 -DCHERIOT_NO_AMBIENT_MALLOC -DDEVICE_EXISTS_shadow -DDEVICE_EXISTS_clint -DDEVICE_EXISTS_uart -DDEVICE_EXISTS_gpio -DDEVICE_EXISTS_gpio -DDEVICE_EXISTS_plic -DREVOKABLE_MEMORY_START=0x00100080
+CFLAGS += $(INC) -Wall -Werror -std=c2x -nostdlib $(CFLAGS_CHERIOT_A7) $(COPT) -DNO_ALLOCA_H -DCHERIOT_IBEX -DIBEX -DSUNBURST -DSUNBURST_SHADOW_BASE=0x30000000 -DSUNBURST_SHADOW_SIZE=0x4000 -DCPU_TIMER_HZ=33000000 -DTICK_RATE_HZ=100 -DCHERIOT_NO_AMBIENT_MALLOC -DDEVICE_EXISTS_shadow -DDEVICE_EXISTS_clint -DDEVICE_EXISTS_uart -DDEVICE_EXISTS_gpio -DDEVICE_EXISTS_gpio -DDEVICE_EXISTS_plic -DREVOKABLE_MEMORY_START=0x00100080
 LDFLAGS += --script=cheriot-a7-100t.ld --relax
 
 CSUPEROPT = -Os # save some code space
@@ -52,13 +52,13 @@ SRC_C = mp_entry.c \
 
 SRC_CXX =
 
-SRC_QSTR += shared/readline/readline.c shared/runtime/pyexec.c
+SRC_QSTR += shared/readline/readline.c shared/runtime/pyexec.c mp_entry.c
 
 SRC_HAL_C = shared/runtime/stdout_helpers.c
 SRC_HAL_CXX = uart_core.cpp
 	
-SRC_MAIN_C = main.c
-SRC_MAIN_CXX = 
+SRC_MAIN_C =
+SRC_MAIN_CXX = main.cpp 
 
 OBJ += $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_CXX:.cpp=.o))
@@ -68,11 +68,12 @@ OBJ_HAL += $(addprefix $(BUILD)/, $(SRC_HAL_C:.c=.o))
 OBJ_HAL += $(addprefix $(BUILD)/, $(SRC_HAL_CXX:.cpp=.o))
 
 OBJ_MAIN += $(addprefix $(BUILD)/, $(SRC_MAIN_C:.c=.o))
-OBJ_MAIN += $(addprefix $(BUILD)/, $(SRC_MAINL_CXX:.cpp=.o))
+OBJ_MAIN += $(addprefix $(BUILD)/, $(SRC_MAIN_CXX:.cpp=.o))
 
 $(OBJ): CFLAGS += -DMP_VM_COMP -cheri-compartment=mp_vm
 $(OBJ_HAL): CFLAGS += -cheri-compartment=mp_hal
 $(OBJ_MAIN): CFLAGS += -cheri-compartment=main
+$(BUILD)/mp_entry.o: CFLAGS += -UCHERIOT_NO_AMBIENT_MALLOC
 
 all: $(BUILD)/micropython.uf2
 
@@ -81,7 +82,7 @@ all_objects : $(OBJ) $(OBJ_HAL) $(OBJ_MAIN)
 
 $(BUILD)/_frozen_mpy.c: $(TOP)/tests/frozen/frozentest.mpy $(BUILD)/genhdr/qstrdefs.generated.h
 	$(ECHO) "MISC freezing bytecode"
-	$(Q)$(TOP)/tools/mpy-tool.py -f -q $(BUILD)/genhdr/qstrdefs.preprocessed.h -mlongint-impl=none $< > $@
+	$(Q)$(TOP)/tools/mpy-tool.py -f -q $(BUILD)/genhdr/qstrdefs.preprocessed.h -mlongint-impl=mpz $< > $@
 
 $(BUILD)/xmake.lua: xmake.lua.top xmake.lua.bottom 
 	cat xmake.lua.top > $@
