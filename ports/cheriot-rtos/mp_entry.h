@@ -43,10 +43,11 @@ typedef struct {
     mp_cb_arg_t __cheri_callback (*func)(void * data, mp_cb_arg_t * args);
     void * data;
     int n_args;
-    char * sig;
+    const char * sig;
 } mp_callback_t;
 
 #ifdef __cplusplus
+
 class MicropythonContext {
   private:
     SObj ctx;
@@ -64,8 +65,9 @@ class MicropythonContext {
     static constexpr char sig_chr(const char * s) { return 's'; }
     static constexpr char sig_chr(SObj o)         { return 'O'; }
     static constexpr char sig_chr(void * p)       { return 'P'; }
-    static constexpr char sig_chr(mp_callback_t p){ return 'C'; }
     template<typename T> static constexpr char sig_chr_ty = sig_chr(static_cast<T>(0));
+    template<> static constexpr char sig_chr_ty<mp_callback_t*> = 'C';
+    template<> static constexpr char sig_chr_ty<const mp_callback_t*> = 'C';
     template<typename T> static constexpr char sig_chr_exact = 0;
     template<> static constexpr char sig_chr_exact<int> = 'i';
     template<> static constexpr char sig_chr_exact<unsigned> = 'I'; 
@@ -75,17 +77,6 @@ class MicropythonContext {
     template<> static constexpr char sig_chr_exact<SObj> = 'O';
     template<> static constexpr char sig_chr_exact<mp_callback_t> = 'C';
     template<typename T> static constexpr char sig_chr_exact<T*> = 'P';
-    template<typename R, typename... Ts>
-    static inline mp_cb_arg_t cb_wrapper_aux(std::function<R(Ts...)> * func, mp_cb_arg_t * empty, Ts... cargs) {
-        return (*func)(cargs...);
-    }
-    template<typename R, typename... Ts, typename T, typename... Us>
-    static inline mp_cb_arg_t cb_wrapper_aux(std::function<R(Ts..., T, Us...)> * func, mp_cb_arg_t * pyargs, Ts... cargs) {
-        return cb_wrapper_aux(func, pyargs + 1, cargs..., argconv<T>(pyargs[0]));
-    }
-    template<typename R, typename... Ts> static mp_cb_arg_t __cheri_callback cb_wrapper(std::function<R(Ts...)> * func, mp_cb_arg_t * args) {
-        return cb_wrapper_aux<R, Ts...>(func, args);
-    }
   public:
     [[nodiscard]] MicropythonContext(MicropythonContext&& src) : ctx(src.ctx) { src.ctx = INVALID_SOBJ; }
     [[nodiscard]] static std::optional<MicropythonContext> create(size_t heapsize) {
@@ -116,10 +107,6 @@ class MicropythonContext {
         return !err;
     }
     int free_obj_handle(SObj obj) { return mp_free_obj_handle(ctx, obj); }
-    template<typename R, typename... Ts> [[nodiscard]] static mp_callback_t leaf_callback(std::function<R(Ts...)> &func) {
-	constexpr const char sig[sizeof...(Ts) + 1] = { sig_chr_exact<R>, sig_chr_exact<Ts>... };
-        return { .func = &cb_wrapper<R, Ts...> , .data = &func , .n_args = sizeof...(Ts), .sig = sig };
-    }
 };
 
 #endif

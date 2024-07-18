@@ -6,8 +6,6 @@
 #include "mp_entry.h"
 #include "mphalport.h"
 
-#include <stdio.h>
-
 void __cheri_compartment("main") entry(void) {
     *MMIO_CAPABILITY(uint32_t, gpio) = 0xaa;
     printf("Test\n");
@@ -32,6 +30,26 @@ void __cheri_compartment("main") entry(void) {
 		std::optional<int> ret = ctx.exec_func<int>("foo", "bar", 7);
 		if(ret) {
 	            printf("Call to python `foo('bar', 7)` returned %d\n", *ret);
+		    continue;
+		} else {
+		    printf("Call to python `foo('bar', 7)` failed.\n");
+		    return;
+		}
+	    } else {
+	        printf("File-mode string execution exited with a failure\n");
+		return;
+	    }
+	case 'E':
+	    if(!ctx.exec_str_file("def foo(a,b):\n print(a)\n return [a , b]\n\ndef bar(a,b):\n for x in a:\n  print(x,b)\n\nprint('created functions `foo` and `bar`')\n")) {
+		std::optional<SObj> ret = ctx.exec_func<SObj>("foo", "baz", 7);
+		if(ret) {
+	            printf("Call to python `foo('baz', 7)` returned SOobj <%x>\n", (ptraddr_t)*ret);
+		    if(ctx.exec_func<void>("bar", *ret, "quux")) {
+		        printf("Call to python `bar(foo('baz',7), 'quux')` succeeded.\n");
+		    } else {
+		        printf("Call to python `bar(foo('baz',7), 'quux')` failed.\n");
+		    }
+		    ctx.free_obj_handle(*ret);
 		    continue;
 		} else {
 		    printf("Call to python `foo('bar', 7)` failed.\n");

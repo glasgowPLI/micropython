@@ -67,6 +67,7 @@ int __cheri_compartment("mp_vm") mp_exec_str_file(SObj ctx, const char *src) {
 }
 
 int __cheri_compartment("mp_vm") mp_free_obj_handle(SObj ctx, SObj obj) {
+    MP_STATE_THREAD_HACK_INIT(token_obj_unseal(mp_ctx_key, ctx))
     obj_export_handle_t * handle = token_obj_unseal(MP_STATE_VM(obj_key), obj);
     if(!handle) return -1;
     if(handle->next) handle->next->prevnext = handle->prevnext;
@@ -101,7 +102,7 @@ static int mp_obj_to_cobj(void * ret, char type, mp_obj_t in) {
 	    obj->obj = in;
             obj->next = MP_STATE_VM(obj_export_head);
 	    obj->prevnext = &MP_STATE_VM(obj_export_head);
-	    MP_STATE_VM(obj_export_head)->prevnext = &obj->next;
+	    if(MP_STATE_VM(obj_export_head)) MP_STATE_VM(obj_export_head)->prevnext = &obj->next;
 	    MP_STATE_VM(obj_export_head) = obj;
 	    return 0;
 	}
@@ -160,13 +161,13 @@ int __cheri_compartment("mp_vm") mp_exec_func_v(SObj ctx, const char * func, voi
 		break;
             }
             case 'C': { /* Cross-compartment callback */
-	        const mp_callback_t cba = va_arg(ap, mp_callback_t);
-		mp_obj_ext_callback_t * cb = m_new_obj_var(mp_obj_ext_callback_t, sig, char, cba.n_args + 1);
+	        const mp_callback_t* cba = va_arg(ap, mp_callback_t*);
+		mp_obj_ext_callback_t * cb = m_new_obj_var(mp_obj_ext_callback_t, sig, char, cba->n_args + 1);
 	        cb->base.type = &mp_type_ext_callback;
-                cb->func = cba.func;
-		cb->data = cba.data;
-		cb->n_args = cba.n_args;
-		memcpy(&cb->sig, cba.sig, cba.n_args + 1);
+                cb->func = cba->func;
+		cb->data = cba->data;
+		cb->n_args = cba->n_args;
+		memcpy(&cb->sig, cba->sig, cba->n_args + 1);
 	        args[i] = MP_OBJ_FROM_PTR(cb);
 		break;
             }
@@ -246,7 +247,9 @@ SObj __cheri_compartment("mp_vm") mp_vminit(size_t heapsize) {
 	token_obj_destroy(MALLOC_CAPABILITY, mp_ctx_key, vm_handle);
 	return INVALID_SOBJ;
     }
+    SKey okey = token_key_new();
     MP_STATE_THREAD_HACK_INIT(ctx)
+    MP_STATE_VM(obj_key) = okey; 
     #if MICROPY_ENABLE_GC
     gc_init(heap, heap + heapsize);
     printf("GC initialised\n");
