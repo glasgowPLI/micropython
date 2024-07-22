@@ -78,11 +78,7 @@ static void machine_pin_obj_init_helper(machine_pin_obj_t *self, size_t n_args,
 
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_mode, MP_ARG_REQUIRED | MP_ARG_INT},
-        {
-            MP_QSTR_value,
-            MP_ARG_KW_ONLY | MP_ARG_OBJ,
-            {.u_obj = MP_OBJ_NULL},
-        }
+        {MP_QSTR_value, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}}
     };
 
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];

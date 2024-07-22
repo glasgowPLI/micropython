@@ -16,62 +16,61 @@
 #define DEFAULT_SPI_FIRSTBIT (SPI_MSB_FIRST)
 
 typedef struct _spi_block_t {
-    uint32_t interruptState;
-    uint32_t interruptEnable;
-    uint32_t interruptTest;
+    uint32_t interrupt_state;
+    uint32_t interrupt_enable;
+    uint32_t interrupt_test;
     uint32_t configuration;
     uint32_t control;
     uint32_t status;
     uint32_t start;
-    uint32_t receiveFifo;
-    uint32_t transmitFifo;
+    uint32_t rx_fifo;
+    uint32_t tx_fifo;
 } spi_block_t;
 
 /// Configuration Register Fields
 enum {
-    ConfigurationHalfClockPeriodMask = 0xffffu << 0,
-    ConfigurationMSBFirst = 1u << 29,
-    ConfigurationClockPhase = 1u << 30,
-    ConfigurationClockPolarity = 1u << 31,
+    CFG_HALF_CLOCK_PERIOD_MASK = 0xffffu << 0,
+    CFG_MSB_FIRST = 1u << 29,
+    CFG_CLOCK_PHASE = 1u << 30,
+    CFG_CLOCK_POLARITY = 1u << 31,
 };
 
 /// Control Register Fields
 enum {
-    ControlTransmitClear = 1 << 0,
-    ControlReceiveClear = 1 << 1,
-    ControlTransmitEnable = 1 << 2,
-    ControlReceiveEnable = 1 << 3,
-    ControlTransmitWatermarkMask = 0xf << 4,
-    ControlReceiveWatermarkMask = 0xf << 8,
+    CTL_TX_CLEAR = 1 << 0,
+    CTL_RX_CLEAR = 1 << 1,
+    CTL_TX_ENABLE = 1 << 2,
+    CTL_RX_ENABLE = 1 << 3,
+    CTL_TX_WATERMARK_MASK = 0xf << 4,
+    CTL_RX_WATERMARK_MASK = 0xf << 8,
 };
 
 /// Status Register Fields
 enum {
-    StatusTxFifoLevel = 0xffu << 0,
-    StatusRxFifoLevel = 0xffu << 8,
-    StatusTxFifoFull = 1u << 16,
-    StatusRxFifoEmpty = 1u << 17,
-    StatusIdle = 1u << 18,
+    STATUS_TX_FIFO_LEVEL = 0xffu << 0,
+    STATUS_RX_FIFO_LEVEL = 0xffu << 8,
+    STATUS_TX_FIFO_FULL = 1u << 16,
+    STATUS_RX_FIFO_EMPTY = 1u << 17,
+    STATUS_IDLE = 1u << 18,
 };
 
 /// Start Register Fields
 enum {
-    StartByteCountMask = 0x7ffu,
+    START_BYTE_COUNT_MASK = 0x7ffu,
 };
 
-void configure_spi_block(volatile spi_block_t *spi, const bool ClockPolarity,
-    const bool ClockPhase, const bool MsbFirst,
-    const uint16_t HalfClockPeriod) {
-    spi->configuration = (ClockPolarity ? ConfigurationClockPolarity : 0) |
-        (ClockPhase ? ConfigurationClockPhase : 0) |
-        (MsbFirst ? ConfigurationMSBFirst : 0) |
-        (HalfClockPeriod & ConfigurationHalfClockPeriodMask);
+void configure_spi_block(volatile spi_block_t *spi, bool cpol, bool cpha,
+    bool msb, uint16_t half_clock_period) {
+    spi->configuration =
+        (cpol ? CFG_CLOCK_POLARITY : 0) | (cpha ? CFG_CLOCK_PHASE : 0) |
+        (msb ? CFG_MSB_FIRST : 0) |
+        (half_clock_period & CFG_HALF_CLOCK_PERIOD_MASK);
 }
 
 /// Waits for the SPI device to become idle
 static void wait_idle(volatile spi_block_t *spi) {
     // Wait whilst IDLE field in STATUS is low
-    while ((spi->status & StatusIdle) == 0) {
+    while ((spi->status & STATUS_IDLE) == 0) {
     }
 }
 
@@ -144,18 +143,11 @@ mp_obj_t machine_spi_make_new(const mp_obj_type_t *type, size_t n_args,
     };
 
     static const mp_arg_t allowed_args[] = {
-        // TODO this one is probably wrong...
-        {MP_QSTR_id, MP_ARG_REQUIRED | MP_ARG_OBJ},
+        {MP_QSTR_id, MP_ARG_REQUIRED | MP_ARG_INT},
         {MP_QSTR_baudrate, MP_ARG_INT, {.u_int = DEFAULT_SPI_BAUDRATE}},
-        {MP_QSTR_polarity,
-         MP_ARG_KW_ONLY | MP_ARG_INT,
-         {.u_int = DEFAULT_SPI_POLARITY}},
-        {MP_QSTR_phase,
-         MP_ARG_KW_ONLY | MP_ARG_INT,
-         {.u_int = DEFAULT_SPI_PHASE}},
-        {MP_QSTR_firstbit,
-         MP_ARG_KW_ONLY | MP_ARG_INT,
-         {.u_int = DEFAULT_SPI_FIRSTBIT}},
+        {MP_QSTR_polarity, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = DEFAULT_SPI_POLARITY}},
+        {MP_QSTR_phase, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = DEFAULT_SPI_PHASE}},
+        {MP_QSTR_firstbit, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = DEFAULT_SPI_FIRSTBIT}},
         {MP_QSTR_sck, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}},
         {MP_QSTR_mosi, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}},
         {MP_QSTR_miso, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}},
@@ -173,7 +165,7 @@ mp_obj_t machine_spi_make_new(const mp_obj_type_t *type, size_t n_args,
             MP_ERROR_TEXT("explicit choice of sck/miso/mosi is not implemented"));
     }
 
-    uint32_t spi_id = mp_obj_get_int(args[ARG_id].u_obj);
+    uint32_t spi_id = args[ARG_id].u_int;
     volatile spi_block_t *block = get_spi_block(spi_id);
 
     uint32_t baudrate = args[ARG_baudrate].u_int;
@@ -216,23 +208,23 @@ static void machine_spi_init(mp_obj_base_t *self_in, size_t n_args,
     uint32_t config = self->spi_block->configuration;
 
     if (baudrate > 0) {
-        config &= ~ConfigurationHalfClockPeriodMask;
+        config &= ~CFG_HALF_CLOCK_PERIOD_MASK;
         config |= convert_baudrate(baudrate);
     }
 
     if (polarity >= 0) {
-        config &= ~ConfigurationClockPolarity;
-        config |= (polarity ? ConfigurationClockPolarity : 0);
+        config &= ~CFG_CLOCK_POLARITY;
+        config |= (polarity ? CFG_CLOCK_POLARITY : 0);
     }
 
     if (phase >= 0) {
-        config &= ~ConfigurationClockPhase;
-        config |= (phase ? ConfigurationClockPhase : 0);
+        config &= ~CFG_CLOCK_PHASE;
+        config |= (phase ? CFG_CLOCK_PHASE : 0);
     }
 
     if (firstbit >= 0) {
-        config &= ~ConfigurationMSBFirst;
-        config |= (firstbit ? ConfigurationMSBFirst : 0);
+        config &= ~CFG_MSB_FIRST;
+        config |= (firstbit ? CFG_MSB_FIRST : 0);
     }
 
     self->spi_block->configuration = config;
@@ -260,29 +252,29 @@ static void machine_spi_transfer(mp_obj_base_t *obj, size_t len,
 
     if (src) {
         trx = true;
-        control = ControlTransmitEnable;
+        control = CTL_TX_ENABLE;
         tx_count = 0;
     }
     if (dest) {
         rcv = true;
-        control |= ControlReceiveEnable;
+        control |= CTL_RX_ENABLE;
         rx_count = 0;
     }
 
     spi_block->control = control;
-    spi_block->start = len & StartByteCountMask;
+    spi_block->start = len & START_BYTE_COUNT_MASK;
 
     while (tx_count < len || rx_count < len) {
         uint32_t status = spi_block->status;
-        if (trx && (status & StatusTxFifoLevel) < 64 && tx_count < len) {
-            spi_block->transmitFifo = src[tx_count];
+        if (trx && (status & STATUS_TX_FIFO_LEVEL) < 64 && tx_count < len) {
+            spi_block->tx_fifo = src[tx_count];
             printf("tx >>> %02x -- %08x\n", src[tx_count],
-                (uint32_t)&(spi_block->transmitFifo));
+                (uint32_t)&(spi_block->tx_fifo));
             tx_count++;
-        } else if (rcv && (status & StatusRxFifoLevel) > 0 && rx_count < len) {
-            dest[rx_count] = spi_block->receiveFifo;
+        } else if (rcv && (status & STATUS_RX_FIFO_LEVEL) > 0 && rx_count < len) {
+            dest[rx_count] = spi_block->rx_fifo;
             printf("rx >>> %02x -- %08x\n", dest[rx_count],
-                (uint32_t)&(spi_block->receiveFifo));
+                (uint32_t)&(spi_block->rx_fifo));
 
             rx_count++;
         }
@@ -295,6 +287,7 @@ static const mp_machine_spi_p_t machine_spi_protocol = {
 };
 
 MP_DEFINE_CONST_OBJ_TYPE(machine_spi_type, MP_QSTR_SPI, MP_TYPE_FLAG_NONE,
-    make_new, machine_spi_make_new, call, print,
-    machine_spi_print, protocol, &machine_spi_protocol,
+    make_new, machine_spi_make_new,
+    print, machine_spi_print,
+    protocol, &machine_spi_protocol,
     locals_dict, &mp_machine_spi_locals_dict);
