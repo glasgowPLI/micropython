@@ -1,3 +1,5 @@
+#include <compartment.h>
+
 #define mp_hal_ticks_ms() (0UL)
 
 #define mp_hal_set_interrupt_char(c) ((void)c)
