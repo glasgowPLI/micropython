@@ -268,12 +268,12 @@ mp_uint_t mp_thread_create(void *(*entry)(void *), void *arg, size_t *stack_size
     thread = th;
 
     mp_thread_unix_end_atomic_section();
-#ifndef __CHERI_PURE_CAPABILITY__ // pthread_t is a pointer, and thus this assertion would fail on purecap
-				  // Since MicroPython seems to only use the return as a unique identifier
-				  // without passing it back into pthread calls, we simply allow the loss
-				  // of provenance
+    #ifndef __CHERI_PURE_CAPABILITY__ // pthread_t is a pointer, and thus this assertion would fail on purecap
+                                      // Since MicroPython seems to only use the return as a unique identifier
+                                      // without passing it back into pthread calls, we simply allow the loss
+                                      // of provenance
     MP_STATIC_ASSERT(sizeof(mp_uint_t) >= sizeof(pthread_t));
-#endif
+    #endif
     return (mp_uint_t)id;
 
 er:

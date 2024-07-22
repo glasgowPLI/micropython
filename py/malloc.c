@@ -264,11 +264,11 @@ void *m_tracked_calloc(size_t nmemb, size_t size) {
     #if !MICROPY_GC_CONSERVATIVE_CLEAR
     memset(&node->data[0], 0, nmemb * size);
     #endif
-#ifdef __CHERI_PURE_CAPABILITY__
+    #ifdef __CHERI_PURE_CAPABILITY__
     return cheri_bounds_set(&node->data[0], nmemb * size);
-#else
+    #else
     return &node->data[0];
-#endif
+    #endif
 }
 
 void m_tracked_free(void *ptr_in) {
@@ -276,14 +276,16 @@ void m_tracked_free(void *ptr_in) {
         return;
     }
     m_tracked_node_t *node = (m_tracked_node_t *)((uint8_t *)ptr_in - sizeof(m_tracked_node_t));
-#ifdef __CHERI_PURE_CAPABILITY__
-    //Widen bounds by finding the matching pointer in the linked list
+    #ifdef __CHERI_PURE_CAPABILITY__
+    // Widen bounds by finding the matching pointer in the linked list
     m_tracked_node_t *seek = MP_STATE_VM(m_tracked_head);
     while (seek != NULL && cheri_address_get(&seek->data[0]) != cheri_address_get(ptr_in)) {
         seek = seek->next;
     }
-    if(cheri_address_get(&seek->data[0]) == cheri_address_get(ptr_in)) node = seek;
-#endif
+    if (cheri_address_get(&seek->data[0]) == cheri_address_get(ptr_in)) {
+        node = seek;
+    }
+    #endif
     #if MICROPY_DEBUG_VERBOSE
     size_t data_bytes;
     #if MICROPY_TRACKED_ALLOC_STORE_SIZE

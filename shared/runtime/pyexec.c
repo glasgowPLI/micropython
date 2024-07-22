@@ -273,8 +273,8 @@ static int do_reader_stdin(int c) {
     // Indicate reception of command.
     mp_hal_stdout_tx_strn("R\x01", 2);
 
-    mp_reader_t * reader = m_new_obj(mp_reader_t);
-    mp_reader_stdin_t * reader_stdin = m_new_obj(mp_reader_stdin_t);
+    mp_reader_t *reader = m_new_obj(mp_reader_t);
+    mp_reader_stdin_t *reader_stdin = m_new_obj(mp_reader_stdin_t);
     mp_reader_new_stdin(reader, reader_stdin, MICROPY_REPL_STDIN_BUFFER_MAX);
     int exec_flags = EXEC_FLAG_PRINT_EOF | EXEC_FLAG_SOURCE_IS_READER;
     int ret = parse_compile_execute(reader, MP_PARSE_FILE_INPUT, exec_flags);
@@ -499,7 +499,7 @@ MP_REGISTER_ROOT_POINTER(vstr_t * repl_line);
 #else // MICROPY_REPL_EVENT_DRIVEN
 
 int pyexec_raw_repl(void) {
-    vstr_t * line = vstr_new(32);
+    vstr_t *line = vstr_new(32);
 
 raw_repl_reset:
     mp_hal_stdout_tx_str("raw REPL; CTRL-B to exit\r\n");
@@ -551,14 +551,14 @@ raw_repl_reset:
 
         int ret = parse_compile_execute(line, MP_PARSE_FILE_INPUT, EXEC_FLAG_PRINT_EOF | EXEC_FLAG_SOURCE_IS_VSTR);
         if (ret & PYEXEC_FORCED_EXIT) {
-	    vstr_free(line);
+            vstr_free(line);
             return ret;
         }
     }
 }
 
 int pyexec_friendly_repl(void) {
-    vstr_t * line = vstr_new(32);
+    vstr_t *line = vstr_new(32);
 
 friendly_repl_reset:
     mp_hal_stdout_tx_str(MICROPY_BANNER_NAME_AND_VERSION);

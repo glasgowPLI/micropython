@@ -500,8 +500,8 @@ int mp_vprintf(const mp_print_t *print, const char *fmt, va_list args) {
                 }
                 #endif
                 size_t len = (prec >= 0) ? strnlen(str, prec) : strlen(str);
-                
-		chrs += mp_print_strn(print, str, len, flags, fill, width);
+
+                chrs += mp_print_strn(print, str, len, flags, fill, width);
                 break;
             }
             case 'd': {

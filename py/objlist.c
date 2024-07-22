@@ -298,8 +298,8 @@ static void mp_quicksort(mp_obj_t *head, mp_obj_t *tail, mp_obj_t key_fn, mp_obj
         mp_obj_t v = key_fn == MP_OBJ_NULL ? tail[0] : mp_call_function_1(key_fn, tail[0]); // get pivot using key_fn
         for (;;) {
             while (h < t && mp_binary_op(MP_BINARY_OP_LESS, key_fn == MP_OBJ_NULL ? h[0] : mp_call_function_1(key_fn, h[0]), v) == binop_less_result) {
-		++h;
-	    }
+                ++h;
+            }
             do {--t;
             } while (h < t && mp_binary_op(MP_BINARY_OP_LESS, v, key_fn == MP_OBJ_NULL ? t[0] : mp_call_function_1(key_fn, t[0])) == binop_less_result);
             if (h >= t) {
@@ -308,7 +308,7 @@ static void mp_quicksort(mp_obj_t *head, mp_obj_t *tail, mp_obj_t key_fn, mp_obj
             mp_obj_t x = h[0];
             h[0] = t[0];
             t[0] = x;
-	    ++h;
+            ++h;
         }
         mp_obj_t x = h[0];
         h[0] = tail[0];

@@ -20,4 +20,3 @@ void MP_HAL_FUNC _mp_hal_stdout_tx_strn_cooked(const char *str, size_t len);
 #define mp_hal_stdout_tx_strn _mp_hal_stdout_tx_strn
 #define mp_hal_stdout_tx_strn_cooked _mp_hal_stdout_tx_strn_cooked
 #endif
-

@@ -206,11 +206,11 @@ static mp_obj_t return_ffi_value(ffi_union_t *val, char type) {
             return mp_obj_new_int_from_ull(val->Q);
         case 'O':
             return (mp_obj_t)(intptr_t)val->ffi;
-#ifdef __CHERI_PURE_CAPABILITY__
+        #ifdef __CHERI_PURE_CAPABILITY__
         case 'P':
-	case 'p':
-	    return mp_obj_new_cap((void*)val->ffi);
-#endif
+        case 'p':
+            return mp_obj_new_cap((void *)val->ffi);
+        #endif
         default:
             return mp_obj_new_int(val->ffi);
     }
@@ -272,11 +272,11 @@ static mp_obj_t ffimod_func(size_t n_args, const mp_obj_t *args) {
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(ffimod_func_obj, 4, 4, ffimod_func);
 
 static mp_obj_t mod_ffi_func(mp_obj_t rettype, mp_obj_t addr_in, mp_obj_t argtypes) {
-#ifdef __CHERI_PURE_CAPABILITY__
+    #ifdef __CHERI_PURE_CAPABILITY__
     void *addr = mp_obj_cap_get(addr_in);
-#else
+    #else
     void *addr = (void *)MP_OBJ_TO_PTR(mp_obj_int_get_truncated(addr_in));
-#endif
+    #endif
     return make_func(rettype, addr, argtypes);
 }
 MP_DEFINE_CONST_FUN_OBJ_3(mod_ffi_func_obj, mod_ffi_func);
@@ -288,8 +288,8 @@ static void call_py_func(ffi_cif *cif, void *ret, void **args, void *user_data) 
 
     for (uint i = 0; i < cif->nargs; i++) {
         pyargs[i] = (cif->arg_types[i] == &ffi_type_pointer)
-		? mp_obj_new_cap(*(void **)args[i])
-		: mp_obj_new_int(*(mp_int_t *)args[i]);
+                ? mp_obj_new_cap(*(void **)args[i])
+                : mp_obj_new_int(*(mp_int_t *)args[i]);
     }
     mp_obj_t res = mp_call_function_n_kw(pyfunc, cif->nargs, 0, pyargs);
 
@@ -404,11 +404,11 @@ static mp_obj_t ffimod_addr(mp_obj_t self_in, mp_obj_t symname_in) {
     if (sym == NULL) {
         mp_raise_OSError(MP_ENOENT);
     }
-#ifdef __CHERI_PURE_CAPABILITY__
+    #ifdef __CHERI_PURE_CAPABILITY__
     return mp_obj_new_cap(sym);
-#else
+    #else
     return mp_obj_new_int((uintptr_t)sym);
-#endif
+    #endif
 }
 MP_DEFINE_CONST_FUN_OBJ_2(ffimod_addr_obj, ffimod_addr);
 
@@ -519,10 +519,10 @@ static mp_obj_t ffifunc_call(mp_obj_t self_in, size_t n_args, size_t n_kw, const
         #endif
         } else if (a == mp_const_none) {
             values[i].ffi = 0;
-#ifdef __CHERI_PURE_CAPABILITY__
-	} else if (mp_obj_is_type(a, &mp_type_cap)) {
+        #ifdef __CHERI_PURE_CAPABILITY__
+        } else if (mp_obj_is_type(a, &mp_type_cap)) {
             values[i].ffi = (ffi_arg)mp_obj_cap_get(a);
-#endif
+        #endif
         } else if (mp_obj_is_int(a)) {
             values[i] = ffi_int_obj_to_ffi_union(a, *argtype);
         } else if (mp_obj_is_str(a)) {
@@ -641,11 +641,11 @@ static mp_obj_t mod_ffi_open(size_t n_args, const mp_obj_t *args) {
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mod_ffi_open_obj, 1, 2, mod_ffi_open);
 
 static mp_obj_t mod_ffi_as_bytearray(mp_obj_t ptr, mp_obj_t size) {
-#ifdef __CHERI_PURE_CAPABILITY__
+    #ifdef __CHERI_PURE_CAPABILITY__
     return mp_obj_new_bytearray_by_ref(mp_obj_int_get_truncated(size), mp_obj_cap_get(ptr));
-#else
+    #else
     return mp_obj_new_bytearray_by_ref(mp_obj_int_get_truncated(size), (void *)(uintptr_t)mp_obj_int_get_truncated(ptr));
-#endif
+    #endif
 }
 MP_DEFINE_CONST_FUN_OBJ_2(mod_ffi_as_bytearray_obj, mod_ffi_as_bytearray);
 

@@ -36,7 +36,7 @@
 
 typedef struct _mp_obj_cap_t {
     mp_obj_base_t base;
-    void * value;
+    void *value;
 } mp_obj_cap_t;
 
 static void capability_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
@@ -69,17 +69,17 @@ static mp_obj_t capability_binary_op(mp_binary_op_t op, mp_obj_t lhs_in, mp_obj_
 
     switch (op) {
         case MP_BINARY_OP_OR:
-	case MP_BINARY_OP_INPLACE_OR:
-	    lhs_val |= rhs_val;
-	    break;
+        case MP_BINARY_OP_INPLACE_OR:
+            lhs_val |= rhs_val;
+            break;
         case MP_BINARY_OP_XOR:
-	case MP_BINARY_OP_INPLACE_XOR:
-	    lhs_val ^= rhs_val;
-	    break;
+        case MP_BINARY_OP_INPLACE_XOR:
+            lhs_val ^= rhs_val;
+            break;
         case MP_BINARY_OP_AND:
-	case MP_BINARY_OP_INPLACE_AND:
-	    lhs_val &= rhs_val;
-	    break;
+        case MP_BINARY_OP_INPLACE_AND:
+            lhs_val &= rhs_val;
+            break;
         case MP_BINARY_OP_ADD:
         case MP_BINARY_OP_INPLACE_ADD:
             lhs_val += rhs_val;
@@ -101,26 +101,26 @@ static mp_obj_t capability_binary_op(mp_binary_op_t op, mp_obj_t lhs_in, mp_obj_
         default:
             return MP_OBJ_NULL; // op not supported
     }
-    return mp_obj_new_cap((void*)lhs_val);
+    return mp_obj_new_cap((void *)lhs_val);
 }
 
 static mp_obj_t cap_to_bytes(size_t n_args, const mp_obj_t *args) {
     (void)n_args;
-    mp_obj_cap_t * self = MP_OBJ_TO_PTR(args[0]);
+    mp_obj_cap_t *self = MP_OBJ_TO_PTR(args[0]);
 
     mp_int_t len = mp_obj_get_int(args[1]);
-    if(len < 0) {
+    if (len < 0) {
         mp_raise_ValueError(NULL);
     }
 
     vstr_t vstr;
     // ensure our buffer is properly aligned
-    void ** buf = m_new(void*, (len + sizeof(void*)) / sizeof(void*));
-    vstr_init_fixed_buf(&vstr, len+1, (void *)buf);
+    void **buf = m_new(void *, (len + sizeof(void *)) / sizeof(void *));
+    vstr_init_fixed_buf(&vstr, len + 1, (void *)buf);
     vstr.len = len;
     vstr.fixed_buf = false; // we don't actually want a fixed buffer, just needed to manually align
     memset(buf, 0, len);
-    
+
     *buf = self->value;
 
     return mp_obj_new_bytes_from_vstr(&vstr);
@@ -141,20 +141,20 @@ MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &cap_locals_dict
     );
 
-mp_obj_t mp_obj_new_cap(void * value) {
+mp_obj_t mp_obj_new_cap(void *value) {
     mp_obj_cap_t *o = m_new_obj(mp_obj_cap_t);
     o->base.type = &mp_type_cap;
     o->value = value;
     return MP_OBJ_FROM_PTR(o);
 }
 
-void * mp_obj_cap_get(mp_obj_t self_in) {
-    if(mp_obj_is_type(self_in, &mp_type_cap)) {
-        mp_obj_cap_t * self = MP_OBJ_TO_PTR(self_in);
+void *mp_obj_cap_get(mp_obj_t self_in) {
+    if (mp_obj_is_type(self_in, &mp_type_cap)) {
+        mp_obj_cap_t *self = MP_OBJ_TO_PTR(self_in);
         return self->value;
     } else {
-	// allow integer objects to appear as tagless pointers, in particular for NULLs
-	return (void*)(uintptr_t)mp_obj_get_int_truncated(self_in);
+        // allow integer objects to appear as tagless pointers, in particular for NULLs
+        return (void *)(uintptr_t)mp_obj_get_int_truncated(self_in);
     }
 }
 
@@ -162,4 +162,3 @@ void * mp_obj_cap_get(mp_obj_t self_in) {
 const mp_obj_cap_t mp_const_cap_null_obj = {{&mp_type_cap}, NULL};
 
 #endif // __CHERI_PURE_CAPABILITY__
-

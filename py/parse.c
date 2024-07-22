@@ -277,9 +277,9 @@ static void *parser_alloc(parser_t *parser, size_t num_bytes) {
         } else {
             // could grow existing memory
             chunk->alloc += num_bytes;
-#ifdef __CHERI_PURE_CAPABILITY__
+            #ifdef __CHERI_PURE_CAPABILITY__
             parser->cur_chunk = chunk = new_data;
-#endif
+            #endif
         }
     }
 
@@ -297,11 +297,11 @@ static void *parser_alloc(parser_t *parser, size_t num_bytes) {
 
     byte *ret = chunk->data + chunk->union_.used;
     chunk->union_.used += num_bytes;
-#ifdef __CHERI_PURE_CAPABILITY__
+    #ifdef __CHERI_PURE_CAPABILITY__
     return cheri_bounds_set(ret, num_bytes);
-#else
+    #else
     return ret;
-#endif
+    #endif
 }
 
 #if MICROPY_COMP_CONST_TUPLE

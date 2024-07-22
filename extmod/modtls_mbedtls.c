@@ -77,11 +77,11 @@ typedef struct _mp_obj_ssl_socket_t {
     mp_obj_t sock;
     mbedtls_ssl_context ssl;
 
-#ifdef __CHERI_PURE_CAPABILITY__
+    #ifdef __CHERI_PURE_CAPABILITY__
     uint64_t poll_mask;
-#else
+    #else
     uintptr_t poll_mask; // Indicates which read or write operations the protocol needs next
-#endif
+    #endif
     int last_error; // The last error code, if any
 } mp_obj_ssl_socket_t;
 

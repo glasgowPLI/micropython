@@ -14,4 +14,3 @@
 #define cheri_unseal(a, b) cunseal((a), (b))
 #define cheri_bounds_set(a, b) csetbounds((a), (b))
 #define cheri_bounds_set_exact(a, b) csetboundsext((a), (b))
-

@@ -3,7 +3,7 @@
 #include <string.h>
 #include <compartment.h>
 
-#include "mp_entry.h"
+#include "mp_entry.hh"
 #include "mphalport.h"
 
 void __cheri_compartment("main") entry(void) {

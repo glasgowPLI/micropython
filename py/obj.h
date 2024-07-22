@@ -1039,7 +1039,7 @@ mp_int_t mp_obj_get_int(mp_const_obj_t arg);
 mp_int_t mp_obj_get_int_truncated(mp_const_obj_t arg);
 bool mp_obj_get_int_maybe(mp_const_obj_t arg, mp_int_t *value);
 #ifdef __CHERI_PURE_CAPABILITY__
-void * mp_obj_cap_get(mp_obj_t self_in);
+void *mp_obj_cap_get(mp_obj_t self_in);
 #endif
 #if MICROPY_PY_BUILTINS_FLOAT
 mp_float_t mp_obj_get_float(mp_obj_t self_in);

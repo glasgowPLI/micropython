@@ -211,11 +211,11 @@ MP_NOINLINE void gc_helper_collect_regs_and_stack(void) {
     // GC stack (and regs because we captured them)
     void **regs_ptr = (void **)(void *)&regs;
     size_t length = (uintptr_t)MP_STATE_THREAD(stack_top) - (uintptr_t)&regs;
-#ifdef __CHERI_PURE_CAPABILITY__
-#include <cheriintrin.h>
+    #ifdef __CHERI_PURE_CAPABILITY__
+    #include <cheriintrin.h>
     // undo automatic narrowing of capability bounds and set bounds to length
     regs_ptr = cheri_bounds_set(cheri_address_set(__builtin_cheri_stack_get(), cheri_address_get(&regs)), length);
-#endif
+    #endif
     gc_collect_root(regs_ptr, length / sizeof(uintptr_t));
 }
 

@@ -39,7 +39,7 @@ __asm(
     "csc cs1, 48(ca0)	\n"
     "j nlr_push_tail	\n"
     );
-    
+
 
 NORETURN void nlr_jump(void *val) {
     MP_STATIC_ASSERT(offsetof(nlr_buf_t, regs) == 16); // asm assumes it
@@ -54,9 +54,9 @@ NORETURN void nlr_jump(void *val) {
         "clc cs1, 48(ca0)         \n"
         "addi a0, zero, 1          \n" // non-local return
         "cret                      \n" // return
-        :         
+        :
         : "C" (top)
-        : "memory"      
+        : "memory"
         );
 
     MP_UNREACHABLE

@@ -99,13 +99,13 @@ void ffi_closure_free(void *ptr);
 void *ffi_closure_alloc(size_t size, void **code) {
     size_t dummy;
     mp_unix_alloc_exec(size, code, &dummy);
-#ifdef __CHERI_PURE_CAPABILITY__
-    void * ret = *code;
-    *code = cheri_sentry_create((char*)*code + 1);
+    #ifdef __CHERI_PURE_CAPABILITY__
+    void *ret = *code;
+    *code = cheri_sentry_create((char *)*code + 1);
     return ret;
-#else
+    #else
     return *code;
-#endif
+    #endif
 }
 
 void ffi_closure_free(void *ptr) {

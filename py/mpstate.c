@@ -33,4 +33,3 @@ mp_dynamic_compiler_t mp_dynamic_compiler = {0};
 #ifndef MICROPY_PY_STATE_THREAD_HACK
 mp_state_ctx_t mp_state_ctx;
 #endif
-

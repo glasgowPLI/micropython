@@ -8,7 +8,7 @@
 // options to control how MicroPython is built
 
 // Use the minimal starting configuration (disables all optional features).
-#define MICROPY_CONFIG_ROM_LEVEL (MICROPY_CONFIG_ROM_LEVEL_CORE_FEATURES) //MINIMUM)
+#define MICROPY_CONFIG_ROM_LEVEL (MICROPY_CONFIG_ROM_LEVEL_CORE_FEATURES) // MINIMUM)
 
 // You can disable the built-in MicroPython compiler by setting the following
 // config option to 0.  If you do this then you won't get a REPL prompt, but you
@@ -20,12 +20,12 @@
 #define MICROPY_HELPER_REPL               (1)
 #define MICROPY_MODULE_FROZEN_MPY         (1)
 #define MICROPY_ENABLE_EXTERNAL_IMPORT    (1)
-#define MICROPY_PY_SYS			  (1)
-#define MICROPY_PY_SYS_MAXSIZE		  (1)
+#define MICROPY_PY_SYS                    (1)
+#define MICROPY_PY_SYS_MAXSIZE            (1)
 #define SSIZE_MAX INT_MAX
-#define MICROPY_PY_SYS_ARGV		  (0)
-#define MICROPY_PY_SYS_MODULES		  (0)
-#define MICROPY_PY_IO			  (0)
+#define MICROPY_PY_SYS_ARGV               (0)
+#define MICROPY_PY_SYS_MODULES            (0)
+#define MICROPY_PY_IO                     (0)
 #define MICROPY_PY_BUILTINS_MEMORYVIEW    (1)
 
 #define MICROPY_LONGINT_IMPL        (MICROPY_LONGINT_IMPL_MPZ)
@@ -48,10 +48,11 @@ typedef long mp_off_t;
 
 #define MICROPY_HEAP_SIZE (65536)
 #define MICROPY_MIN_USE_CHERIOT_A7 (1)
-#define alloca(size) __builtin_alloca (size)
-static  __attribute__((unused)) __attribute__((always_inline)) size_t strnlen(const char * s, size_t maxlen) { 
+#define alloca(size) __builtin_alloca(size)
+static __attribute__((unused)) __attribute__((always_inline)) size_t strnlen(const char *s, size_t maxlen) {
     int i = 0;
-    while(*s++ && ++i < maxlen);
+    while (*s++ && ++i < maxlen) {
+    }
     return i;
 }
 
