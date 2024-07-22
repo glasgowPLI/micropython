@@ -8,6 +8,7 @@ MICROPY_ROM_TEXT_COMPRESSION ?= 0
 
 # include py core make definitions
 include $(TOP)/py/py.mk
+include $(TOP)/extmod/extmod.mk
 
 CLLVM_DIR ?= ~/cheriot-llvm/
 CRTOS_DIR ?= ../../../cheriot-rtos
@@ -49,10 +50,11 @@ SRC_C = mp_entry.c \
 	shared/readline/readline.c \
 	shared/runtime/pyexec.c \
 	$(BUILD)/_frozen_mpy.c \
+	machine_pin.c 
 
 SRC_CXX =
 
-SRC_QSTR += shared/readline/readline.c shared/runtime/pyexec.c mp_entry.c
+SRC_QSTR += shared/readline/readline.c shared/runtime/pyexec.c mp_entry.c machine_pin.c 
 
 SRC_HAL_C = shared/runtime/stdout_helpers.c
 SRC_HAL_CXX = uart_core.cpp
@@ -62,7 +64,7 @@ SRC_MAIN_CXX = main.cpp
 
 OBJ += $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_CXX:.cpp=.o))
-OBJ += $(PY_CORE_O)
+OBJ += $(PY_O)
 
 OBJ_HAL += $(addprefix $(BUILD)/, $(SRC_HAL_C:.c=.o))
 OBJ_HAL += $(addprefix $(BUILD)/, $(SRC_HAL_CXX:.cpp=.o))

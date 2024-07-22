@@ -30,7 +30,11 @@
 
 #define MICROPY_LONGINT_IMPL        (MICROPY_LONGINT_IMPL_MPZ)
 
-#define MICROPY_ALLOC_PATH_MAX            (256)
+#define MICROPY_ALLOC_PATH_MAX (256)
+
+#define MICROPY_PY_MACHINE (1)
+#define MICROPY_PY_MACHINE_INCLUDEFILE "ports/cheriot-rtos/modmachine.c"
+#define MICROPY_PY_MACHINE_PIN_MAKE_NEW mp_pin_make_new
 
 // Use the minimum headroom in the chunk allocator for parse nodes.
 #define MICROPY_ALLOC_PARSE_CHUNK_INIT    (16)
