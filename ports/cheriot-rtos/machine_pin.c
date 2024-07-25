@@ -71,9 +71,7 @@ volatile gpio_block_t *get_port(const char *drv_name) {
     }
 }
 
-static void machine_pin_obj_init_helper(machine_pin_obj_t *self, size_t n_args,
-    const mp_obj_t *pos_args,
-    mp_map_t *kw_args) {
+static void machine_pin_obj_init_helper(machine_pin_obj_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     enum { ARG_mode, ARG_value };
 
     static const mp_arg_t allowed_args[] = {
@@ -102,8 +100,7 @@ static void machine_pin_obj_init_helper(machine_pin_obj_t *self, size_t n_args,
 }
 
 // constructor Pin(id, mode, *, value)
-mp_obj_t mp_pin_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw,
-    const mp_obj_t *args) {
+mp_obj_t mp_pin_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 1, MP_OBJ_FUN_ARGS_MAX, true);
 
     if (!mp_obj_is_type(args[0], &mp_type_tuple)) {
@@ -134,11 +131,10 @@ mp_obj_t mp_pin_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw,
 }
 
 // Pin.init(mode, *, value)
-static mp_obj_t machine_pin_obj_init(size_t n_args, const mp_obj_t *args,
-    mp_map_t *kw_args) {
+static mp_obj_t machine_pin_obj_init(size_t n_args, const mp_obj_t *args, mp_map_t *kw_args) {
     if (mp_obj_is_type(args[0], &machine_pin_type)) {
-        machine_pin_obj_init_helper(MP_OBJ_TO_PTR(args[0]), n_args - 1, args + 1,
-            kw_args);
+        machine_pin_obj_init_helper(
+            MP_OBJ_TO_PTR(args[0]), n_args - 1, args + 1, kw_args);
         return args[0];
     } else {
         mp_raise_TypeError(
@@ -147,26 +143,23 @@ static mp_obj_t machine_pin_obj_init(size_t n_args, const mp_obj_t *args,
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(machine_pin_init_obj, 1, machine_pin_obj_init);
 
-static mp_uint_t pin_ioctl(mp_obj_t self_in, mp_uint_t request, uintptr_t arg,
-    int *errcode) {
+static mp_uint_t pin_ioctl(mp_obj_t self_in, mp_uint_t request, uintptr_t arg, int *errcode) {
     (void)errcode;
     machine_pin_obj_t *self = MP_OBJ_TO_PTR(self_in);
 
     switch (request) {
         case MP_PIN_READ: {
-            if (self->mode == MACHINE_PIN_MODE_IN) {
-                return (self->port->input >> self->pin) & 1;
-            } else {
+            if (self->mode == MACHINE_PIN_MODE_OUT) {
                 return GET_BUFFER(self);
             }
+
+            return (self->port->input >> self->pin) & 1;
         }
         case MP_PIN_WRITE: {
             uint32_t block = set_pin_value(self->port->output, self->pin, (bool)arg);
-
             if (self->mode == MACHINE_PIN_MODE_OPEN_DRAIN) {
                 block = set_pin_enable(block, self->pin, !(bool)arg);
             }
-
             self->port->output = block;
             return 0;
         }
@@ -174,8 +167,7 @@ static mp_uint_t pin_ioctl(mp_obj_t self_in, mp_uint_t request, uintptr_t arg,
     return -1;
 }
 
-static mp_obj_t machine_pin_call(mp_obj_t self_in, size_t n_args, size_t n_kw,
-    const mp_obj_t *args) {
+static mp_obj_t machine_pin_call(mp_obj_t self_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     mp_arg_check_num(n_args, n_kw, 0, 1, false);
 
     if (n_args == 0) {
@@ -186,18 +178,19 @@ static mp_obj_t machine_pin_call(mp_obj_t self_in, size_t n_args, size_t n_kw,
     }
 }
 
-// Pin.value([value])
+
 static mp_obj_t machine_pin_value(size_t n_args, const mp_obj_t *args) {
     return machine_pin_call(args[0], n_args - 1, 0, args + 1);
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(machine_pin_value_obj, 1, 2,
-    machine_pin_value);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(machine_pin_value_obj, 1, 2, machine_pin_value);
+
 
 static mp_obj_t machine_pin_off(mp_obj_t self_in) {
     mp_virtual_pin_write(self_in, 0);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(machine_pin_off_obj, machine_pin_off);
+
 
 static mp_obj_t machine_pin_on(mp_obj_t self_in) {
     mp_virtual_pin_write(self_in, 1);
@@ -222,7 +215,7 @@ static void machine_pin_print(const mp_print_t *print, mp_obj_t self_in,
             mode_str = "OPEN DRAIN";
             break;
         default:
-            mode_str = "unknown mode";
+            mode_str = "Unknown mode";
     }
 
     const char *name_str;
@@ -237,11 +230,12 @@ static void machine_pin_print(const mp_print_t *print, mp_obj_t self_in,
         case 0x80008000:
             name_str = "pmod";
         default:
-            name_str = "unknown port";
+            name_str = "Unknown port";
     }
 
     mp_printf(print, "Pin(%s(%d) mode=%s)", name_str, self->pin, mode_str);
 }
+
 
 static const mp_rom_map_elem_t machine_pin_locals_dict_table[] = {
     // instance methods
@@ -257,19 +251,17 @@ static const mp_rom_map_elem_t machine_pin_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_OUT), MP_ROM_INT(MACHINE_PIN_MODE_OUT)},
     {MP_ROM_QSTR(MP_QSTR_OPEN_DRAIN), MP_ROM_INT(MACHINE_PIN_MODE_OPEN_DRAIN)},
 };
-static MP_DEFINE_CONST_DICT(machine_pin_locals_dict,
-    machine_pin_locals_dict_table);
+static MP_DEFINE_CONST_DICT(machine_pin_locals_dict, machine_pin_locals_dict_table);
 
 static const mp_pin_p_t pin_pin_p = {
     .ioctl = pin_ioctl,
 };
 
-/**
- * TODO:
- * pin.mode()
- */
-
-MP_DEFINE_CONST_OBJ_TYPE(machine_pin_type, MP_QSTR_Pin, MP_TYPE_FLAG_NONE,
-    make_new, mp_pin_make_new, print, machine_pin_print,
-    call, machine_pin_call, protocol, &pin_pin_p,
+MP_DEFINE_CONST_OBJ_TYPE(machine_pin_type,
+    MP_QSTR_Pin,
+    MP_TYPE_FLAG_NONE,
+    make_new, mp_pin_make_new,
+    print, machine_pin_print,
+    call, machine_pin_call,
+    protocol, &pin_pin_p,
     locals_dict, &machine_pin_locals_dict);
