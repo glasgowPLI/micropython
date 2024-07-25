@@ -41,6 +41,7 @@ enum { SPI_MSB_FIRST, SPI_LSB_FIRST };
 #define MICROPY_PY_MACHINE_SPI              (1)
 #define MICROPY_PY_MACHINE_SPI_MSB          (SPI_MSB_FIRST)
 #define MICROPY_PY_MACHINE_SPI_LSB          (SPI_LSB_FIRST)
+#define MICROPY_PY_MACHINE_I2C              (1)
 
 // Use the minimum headroom in the chunk allocator for parse nodes.
 #define MICROPY_ALLOC_PARSE_CHUNK_INIT      (16)

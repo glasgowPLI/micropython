@@ -51,11 +51,12 @@ SRC_C = mp_entry.c \
 	shared/runtime/pyexec.c \
 	$(BUILD)/_frozen_mpy.c \
 	machine_pin.c \
-	machine_spi.c
+	machine_spi.c \
+	machine_i2c.c
 
-SRC_CXX =
+SRC_CXX = hal/i2c.cpp
 
-SRC_QSTR += shared/readline/readline.c shared/runtime/pyexec.c mp_entry.c machine_pin.c machine_spi.c
+SRC_QSTR += shared/readline/readline.c shared/runtime/pyexec.c mp_entry.c machine_pin.c machine_spi.c machine_i2c.c
 
 SRC_HAL_C = shared/runtime/stdout_helpers.c
 SRC_HAL_CXX = uart_core.cpp
