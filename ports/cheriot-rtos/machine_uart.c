@@ -8,16 +8,18 @@ typedef struct OpenTitanUart open_titan_uart_t;
 typedef struct _machine_uart_obj_t {
     mp_obj_base_t base;
     volatile open_titan_uart_t *uart_block;
+    uint32_t timeout_ms;
+    uint32_t char_timeout_ms;
 } machine_uart_obj_t;
 
 
+extern void uart_init(volatile open_titan_uart_t *block, uint32_t baudrate);
 extern uint8_t uart_get_rx_level(volatile open_titan_uart_t *block);
 extern uint8_t uart_get_tx_level(volatile open_titan_uart_t *block);
 extern bool uart_is_readable(volatile open_titan_uart_t *block);
 extern bool uart_is_writable(volatile open_titan_uart_t *block);
-extern uint8_t uart_read(volatile open_titan_uart_t *block);
+extern bool uart_read(volatile open_titan_uart_t *block, uint8_t *out, uint32_t timeout_ms);
 extern void uart_write(volatile open_titan_uart_t *block, uint8_t data);
-extern void uart_init(volatile open_titan_uart_t *block, uint32_t baudrate);
 
 volatile open_titan_uart_t *get_uart_block(uint32_t id) {
     switch (id)
@@ -49,8 +51,8 @@ static void mp_machine_uart_init_helper(machine_uart_obj_t *self, size_t n_args,
         { MP_QSTR_rx, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
         { MP_QSTR_cts, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
         { MP_QSTR_rts, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
-        { MP_QSTR_timeout, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = -1} },
-        { MP_QSTR_timeout_char, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = -1} },
+        { MP_QSTR_timeout, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 100} },
+        { MP_QSTR_timeout_char, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 100} },
         { MP_QSTR_invert, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = -1} },
         { MP_QSTR_flow, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = -1} },
         { MP_QSTR_txbuf, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 32} },
@@ -84,11 +86,6 @@ static void mp_machine_uart_init_helper(machine_uart_obj_t *self, size_t n_args,
         mp_raise_ValueError("rx buffer is 64 bytes long");
     }
 
-    if (args[ARG_timeout].u_int != -1 ||
-        args[ARG_timeout_char].u_int != -1) {
-        mp_raise_NotImplementedError("UART Timeouts not implemented");
-    }
-
     if (args[ARG_invert].u_int != -1) {
         mp_raise_NotImplementedError("UART invert not implemented");
     }
@@ -102,6 +99,9 @@ static void mp_machine_uart_init_helper(machine_uart_obj_t *self, size_t n_args,
         mp_raise_NotImplementedError("UART parity not implemented");
         // parity = mp_obj_get_int(args[ARG_parity].u_obj);
     }
+
+    self->timeout_ms = args[ARG_timeout].u_int;
+    self->char_timeout_ms = args[ARG_timeout_char].u_int;
 
     uint32_t baudrate = args[ARG_baudrate].u_int;
     uart_init(self->uart_block, baudrate);
@@ -141,11 +141,21 @@ static bool mp_machine_uart_txdone(machine_uart_obj_t *self) {
 
 static mp_uint_t mp_machine_uart_read(mp_obj_t self_in, void *buf_in, mp_uint_t size, int *errcode) {
     machine_uart_obj_t *self = MP_OBJ_TO_PTR(self_in);
-
-    uint8_t *dest = buf_in;
+    uint8_t *dest = (uint8_t *)buf_in;
 
     for (size_t i = 0; i < size; i++) {
-        dest[i] = uart_read(self->uart_block);
+        uint32_t timeout = (i == 0? self->timeout_ms:self->char_timeout_ms);
+        if (!uart_read(self->uart_block, &dest[i], timeout)) {
+            for (size_t x = 0; x < size; x++) {
+            }
+            if (i <= 0) {
+                *errcode = MP_EAGAIN;
+                return MP_STREAM_ERROR;
+            } else {
+                return i;
+            }
+        }
+
     }
     return size;
 }
@@ -153,12 +163,12 @@ static mp_uint_t mp_machine_uart_read(mp_obj_t self_in, void *buf_in, mp_uint_t 
 
 static mp_uint_t mp_machine_uart_write(mp_obj_t self_in, const void *buf_in, mp_uint_t size, int *errcode) {
     machine_uart_obj_t *self = MP_OBJ_TO_PTR(self_in);
-
     uint8_t *data = (uint8_t *)buf_in;
 
     for (size_t i = 0; i < size; i++) {
         uart_write(self->uart_block, data[i]);
     }
+
     return size;
 }
 

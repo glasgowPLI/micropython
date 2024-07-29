@@ -54,7 +54,7 @@ SRC_C = mp_entry.c \
 	machine_spi.c \
 	machine_i2c.c
 
-SRC_CXX = hal/i2c.cpp
+SRC_CXX = hal/i2c.cpp hal/uart.cpp hal/timer.cpp
 
 SRC_QSTR += shared/readline/readline.c shared/runtime/pyexec.c mp_entry.c machine_pin.c machine_spi.c machine_i2c.c
 
