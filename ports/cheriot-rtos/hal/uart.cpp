@@ -1,9 +1,6 @@
 #include <platform-uart.hh>
 
-extern uint64_t get_time();
-
-#define CLOCK_FREQ_KHZ (50000)
-#define MS_TO_CLOCK_CYCLES(x) (x * CLOCK_FREQ_KHZ) // clock 50mHz
+#include "timer.h"
 
 extern "C" uint8_t uart_get_rx_level(volatile OpenTitanUart<115'200> *block) {
     return (block->fifoStatus >> 16) & 0xff;
