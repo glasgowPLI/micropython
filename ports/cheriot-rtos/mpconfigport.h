@@ -11,7 +11,7 @@ enum { SPI_MSB_FIRST, SPI_LSB_FIRST };
 
 // Use the minimal starting configuration (disables all optional features).
 #define MICROPY_CONFIG_ROM_LEVEL \
-        (MICROPY_CONFIG_ROM_LEVEL_CORE_FEATURES) // MINIMUM)
+    (MICROPY_CONFIG_ROM_LEVEL_CORE_FEATURES)     // MINIMUM)
 
 // You can disable the built-in MicroPython compiler by setting the following
 // config option to 0.  If you do this then you won't get a REPL prompt, but you

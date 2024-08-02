@@ -94,7 +94,11 @@ static void machine_pin_obj_init_helper(machine_pin_obj_t *self, size_t n_args, 
         (self->mode == MACHINE_PIN_MODE_OPEN_DRAIN && !init);
 
     uint32_t block = self->port->output;
-    block = set_pin_enable(block, self->pin, enabled);
+
+    if (self->port != MMIO_CAPABILITY(gpio_block_t, gpio)) {
+        block = set_pin_enable(block, self->pin, enabled);
+    }
+
     block = set_pin_value(block, self->pin, init);
     self->port->output = block;
 }
@@ -120,6 +124,7 @@ mp_obj_t mp_pin_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, 
     pin->base.type = &machine_pin_type;
     pin->port = wanted_port;
     pin->pin = wanted_pin;
+    pin->mode = MACHINE_PIN_MODE_OUT;
 
     if (n_args > 1 || n_kw > 0) {
         mp_map_t kw_args;
@@ -157,7 +162,7 @@ static mp_uint_t pin_ioctl(mp_obj_t self_in, mp_uint_t request, uintptr_t arg, i
         }
         case MP_PIN_WRITE: {
             uint32_t block = set_pin_value(self->port->output, self->pin, (bool)arg);
-            if (self->mode == MACHINE_PIN_MODE_OPEN_DRAIN) {
+            if ((self->port != MMIO_CAPABILITY(gpio_block_t, gpio)) & (self->mode == MACHINE_PIN_MODE_OPEN_DRAIN)) {
                 block = set_pin_enable(block, self->pin, !(bool)arg);
             }
             self->port->output = block;
@@ -237,6 +242,21 @@ static void machine_pin_print(const mp_print_t *print, mp_obj_t self_in,
 }
 
 
+static mp_obj_t machine_pin_toggle(mp_obj_t self_in) {
+    machine_pin_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    // if (self->mode == MACHINE_PIN_MODE_IN) {
+    // }
+    if (self->mode == MACHINE_PIN_MODE_OUT) {
+        self->port->output = set_pin_value(self->port->output, self->pin, !GET_BUFFER(self));
+    } else if (self->mode == MACHINE_PIN_MODE_OPEN_DRAIN) {
+        bool value = GET_BUFFER(self);
+        uint32_t block = set_pin_value(self->port->output, self->pin, !value);
+        self->port->output = set_pin_enable(block, self->pin, value);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(machine_pin_toggle_obj, machine_pin_toggle);
+
 static const mp_rom_map_elem_t machine_pin_locals_dict_table[] = {
     // instance methods
     {MP_ROM_QSTR(MP_QSTR_init), MP_ROM_PTR(&machine_pin_init_obj)},
@@ -245,6 +265,7 @@ static const mp_rom_map_elem_t machine_pin_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_high), MP_ROM_PTR(&machine_pin_on_obj)},
     {MP_ROM_QSTR(MP_QSTR_off), MP_ROM_PTR(&machine_pin_off_obj)},
     {MP_ROM_QSTR(MP_QSTR_on), MP_ROM_PTR(&machine_pin_on_obj)},
+    {MP_ROM_QSTR(MP_QSTR_toggle), MP_ROM_PTR(&machine_pin_toggle_obj)},
 
     // class constants
     {MP_ROM_QSTR(MP_QSTR_IN), MP_ROM_INT(MACHINE_PIN_MODE_IN)},
