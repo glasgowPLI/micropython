@@ -126,7 +126,6 @@ static mp_obj_t mp_machine_uart_make_new(const mp_obj_type_t *type, size_t n_arg
 }
 
 
-// TODO this one too
 static void mp_machine_uart_deinit(machine_uart_obj_t *self) {
 
 }
@@ -200,6 +199,3 @@ static mp_uint_t mp_machine_uart_ioctl(mp_obj_t self_in, mp_uint_t request, uint
     }
     return ret;
 }
-
-
-#define MICROPY_PY_MACHINE_UART_CLASS_CONSTANTS

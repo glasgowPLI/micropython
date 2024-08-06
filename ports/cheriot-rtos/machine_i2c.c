@@ -7,12 +7,9 @@
 typedef struct OpenTitanI2c open_titan_i2c_t;
 
 extern void i2c_setup(volatile open_titan_i2c_t *i2c, uint32_t freq_kHz);
-extern void i2c_send_address(volatile open_titan_i2c_t *i2c, uint8_t addr);
+extern bool i2c_send_address(volatile open_titan_i2c_t *i2c, uint8_t addr);
 extern bool i2c_blocking_read(volatile open_titan_i2c_t *i2c, uint8_t addr, uint8_t *buf, uint32_t len);
-extern void i2c_blocking_write(volatile open_titan_i2c_t *i2c, uint8_t addr, uint8_t *buf, uint32_t len, bool skipStop);
-
-extern bool  i2c_check_success(volatile open_titan_i2c_t *i2c);
-
+extern bool i2c_blocking_write(volatile open_titan_i2c_t *i2c, uint8_t addr, uint8_t *buf, uint32_t len, bool skipStop);
 
 typedef struct _machine_i2c_obj_t {
     mp_obj_base_t base;
@@ -22,15 +19,18 @@ typedef struct _machine_i2c_obj_t {
 
 #define I2C_DEFAULT_FREQ (400000)
 
+#define SPI_BLOCK_0 (0x80200000)
+#define SPI_BLOCK_1 (0x80201000)
+
 static void machine_i2c_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     machine_i2c_obj_t *self = (machine_i2c_obj_t *)MP_OBJ_TO_PTR(self_in);
     const char *name;
 
-    switch ((uint32_t)self->i2c_block) {
-        case 2149580800:
+    switch ((ptraddr_t)self->i2c_block) {
+        case SPI_BLOCK_0:
             name = "0";
             break;
-        case 2149584896:
+        case SPI_BLOCK_1:
             name = "1";
             break;
         default:
@@ -100,15 +100,13 @@ static int machine_i2c_transfer_single(mp_obj_base_t *self_in, uint16_t addr, si
     bool success;
 
     if (len == 0) {
-        i2c_send_address(self->i2c_block, addr);
-        success = i2c_check_success(self->i2c_block);
+        success = i2c_send_address(self->i2c_block, addr);
 
     } else if (flags & MP_MACHINE_I2C_FLAG_READ) {
         success = i2c_blocking_read(self->i2c_block, addr, buf, len);
 
     } else {
-        i2c_blocking_write(self->i2c_block, addr, buf, len, !stop);
-        success = i2c_check_success(self->i2c_block);
+        success = i2c_blocking_write(self->i2c_block, addr, buf, len, !stop);
     }
     return success ? len : -5;
 }
