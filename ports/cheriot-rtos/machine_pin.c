@@ -4,7 +4,12 @@
 #include "py/obj.h"
 #include "py/runtime.h"
 
-typedef struct {
+#define GPIO_GPIO_ADDR (0x80000000)
+#define GPIO_RPI_ADDR  (0x80006000)
+#define GPIO_ARDUINO_ADDR (0x80007000)
+#define GPIO_PMOD_ADDR (0x80008000)
+
+typedef struct _gpio_block_t {
     uint32_t output;
     uint32_t input;
     uint32_t debounced_input;
@@ -44,8 +49,6 @@ static uint32_t set_pin_enable(uint32_t block, uint32_t pin, bool value) {
 }
 
 volatile gpio_block_t *get_port(const char *drv_name) {
-    // !! MMIO_CAPABILITY names were custom hard-coded into the boards/sonata.json
-    // !! file since the headers are currently out of date.
     switch (drv_name[0]) {
         case 'g':
             if (strcmp(drv_name, "gpio") == 0) {
@@ -226,13 +229,13 @@ static void machine_pin_print(const mp_print_t *print, mp_obj_t self_in,
     const char *name_str;
 
     switch ((ptraddr_t)self->port) {
-        case 0x80000000:
+        case GPIO_GPIO_ADDR:
             name_str = "gpio";
-        case 0x80006000:
+        case GPIO_RPI_ADDR:
             name_str = "rpi";
-        case 0x80007000:
+        case GPIO_ARDUINO_ADDR:
             name_str = "arduino";
-        case 0x80008000:
+        case GPIO_PMOD_ADDR:
             name_str = "pmod";
         default:
             name_str = "Unknown port";
@@ -244,8 +247,7 @@ static void machine_pin_print(const mp_print_t *print, mp_obj_t self_in,
 
 static mp_obj_t machine_pin_toggle(mp_obj_t self_in) {
     machine_pin_obj_t *self = MP_OBJ_TO_PTR(self_in);
-    // if (self->mode == MACHINE_PIN_MODE_IN) {
-    // }
+    // if (self->mode == MACHINE_PIN_MODE_IN) {}
     if (self->mode == MACHINE_PIN_MODE_OUT) {
         self->port->output = set_pin_value(self->port->output, self->pin, !GET_BUFFER(self));
     } else if (self->mode == MACHINE_PIN_MODE_OPEN_DRAIN) {

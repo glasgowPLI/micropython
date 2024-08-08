@@ -1,9 +1,10 @@
 #include "py/stream.h"
 #include "py/runtime.h"
 #include "py/obj.h"
+#include "mphalport.h"
 
+#define MICROPY_PY_MACHINE_UART_CLASS_CONSTANTS
 
-typedef struct OpenTitanUart open_titan_uart_t;
 
 typedef struct _machine_uart_obj_t {
     mp_obj_base_t base;
@@ -13,21 +14,15 @@ typedef struct _machine_uart_obj_t {
 } machine_uart_obj_t;
 
 
-extern void uart_init(volatile open_titan_uart_t *block, uint32_t baudrate);
-extern uint8_t uart_get_rx_level(volatile open_titan_uart_t *block);
-extern uint8_t uart_get_tx_level(volatile open_titan_uart_t *block);
-extern bool uart_is_readable(volatile open_titan_uart_t *block);
-extern bool uart_is_writable(volatile open_titan_uart_t *block);
-extern bool uart_read(volatile open_titan_uart_t *block, uint8_t *out, uint32_t timeout_ms);
-extern void uart_write(volatile open_titan_uart_t *block, uint8_t data);
-
 volatile open_titan_uart_t *get_uart_block(uint32_t id) {
     switch (id)
     {
+        #if 0
         case 1:
             return MMIO_CAPABILITY(open_titan_uart_t, uart1);
         case 2:
             return MMIO_CAPABILITY(open_titan_uart_t, uart2);
+        #endif
         default:
             mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("Unknown UART device \"%d\""), id);
     }
@@ -144,7 +139,7 @@ static mp_uint_t mp_machine_uart_read(mp_obj_t self_in, void *buf_in, mp_uint_t 
 
     for (size_t i = 0; i < size; i++) {
         uint32_t timeout = (i == 0? self->timeout_ms:self->char_timeout_ms);
-        if (!uart_read(self->uart_block, &dest[i], timeout)) {
+        if (!uart_timeout_read(self->uart_block, &dest[i], timeout)) {
             for (size_t x = 0; x < size; x++) {
             }
             if (i <= 0) {
@@ -165,7 +160,7 @@ static mp_uint_t mp_machine_uart_write(mp_obj_t self_in, const void *buf_in, mp_
     uint8_t *data = (uint8_t *)buf_in;
 
     for (size_t i = 0; i < size; i++) {
-        uart_write(self->uart_block, data[i]);
+        uart_blocking_write(self->uart_block, data[i]);
     }
 
     return size;

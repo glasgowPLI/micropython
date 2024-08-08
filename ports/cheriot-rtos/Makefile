@@ -54,34 +54,39 @@ SRC_C = mp_entry.c \
 	machine_spi.c \
 	machine_i2c.c
 
-SRC_CXX = hal/i2c.cpp hal/uart.cpp hal/timer.cpp
+SRC_CXX = 
 
 SRC_QSTR += shared/readline/readline.c shared/runtime/pyexec.c mp_entry.c machine_pin.c machine_spi.c machine_i2c.c
 
 SRC_HAL_C = shared/runtime/stdout_helpers.c
-SRC_HAL_CXX = uart_core.cpp
+SRC_HAL_CXX = uart_core.cpp hal/i2c.cpp hal/uart.cpp hal/timer.cpp
 	
 SRC_MAIN_C =
 SRC_MAIN_CXX = main.cpp 
 
-OBJ += $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
-OBJ += $(addprefix $(BUILD)/, $(SRC_CXX:.cpp=.o))
-OBJ += $(PY_O)
+OBJ_VM += $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
+OBJ_VM += $(addprefix $(BUILD)/, $(SRC_CXX:.cpp=.o))
+OBJ_VM += $(PY_O)
 
 OBJ_HAL += $(addprefix $(BUILD)/, $(SRC_HAL_C:.c=.o))
 OBJ_HAL += $(addprefix $(BUILD)/, $(SRC_HAL_CXX:.cpp=.o))
 
 OBJ_MAIN += $(addprefix $(BUILD)/, $(SRC_MAIN_C:.c=.o))
 OBJ_MAIN += $(addprefix $(BUILD)/, $(SRC_MAIN_CXX:.cpp=.o))
+ 
+OBJ += $(OBJ_VM) 
+OBJ += $(OBJ_HAL)
+OBJ += $(OBJ_MAIN)
 
-$(OBJ): CFLAGS += -DMP_VM_COMP -cheri-compartment=mp_vm
+$(OBJ_VM): CFLAGS += -DMP_VM_COMP -cheri-compartment=mp_vm
 $(OBJ_HAL): CFLAGS += -cheri-compartment=mp_hal
 $(OBJ_MAIN): CFLAGS += -cheri-compartment=main
 $(BUILD)/mp_entry.o: CFLAGS += -UCHERIOT_NO_AMBIENT_MALLOC
+$(BUILD)/hal/i2c.o: CFLAGS += -Wno-unused-variable
 
 all: $(BUILD)/micropython.uf2
 
-all_objects : $(OBJ) $(OBJ_HAL) $(OBJ_MAIN)
+all_objects : $(OBJ_VM) $(OBJ_HAL) $(OBJ_MAIN)
 .PHONY: all all_objects
 
 $(BUILD)/_frozen_mpy.c: $(TOP)/tests/frozen/frozentest.mpy $(BUILD)/genhdr/qstrdefs.generated.h
@@ -91,7 +96,7 @@ $(BUILD)/_frozen_mpy.c: $(TOP)/tests/frozen/frozentest.mpy $(BUILD)/genhdr/qstrd
 $(BUILD)/xmake.lua: xmake.lua.top xmake.lua.bottom 
 	cat xmake.lua.top > $@
 	echo "compartment(\"mp_vm\")" >> $@
-	for OFILE in $(patsubst $(BUILD)/%,%,$(OBJ)) ; do echo "    add_files(\"$$OFILE\", {rule = \"utils.merge.object\"})" >> $@ ; done
+	for OFILE in $(patsubst $(BUILD)/%,%,$(OBJ_VM)) ; do echo "    add_files(\"$$OFILE\", {rule = \"utils.merge.object\"})" >> $@ ; done
 	echo "compartment(\"mp_hal\")" >> $@
 	for OFILE in $(patsubst $(BUILD)/%,%,$(OBJ_HAL)) ; do echo "    add_files(\"$$OFILE\", {rule = \"utils.merge.object\"})" >> $@ ; done
 	echo "compartment(\"main\")" >> $@

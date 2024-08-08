@@ -13,6 +13,9 @@
 #define DEFAULT_SPI_BITS (8)
 #define DEFAULT_SPI_FIRSTBIT (SPI_MSB_FIRST)
 
+#define SPI_0_ADDR (0x80300000)
+#define SPI_1_ADDR (0x80301000)
+#define SPI_2_ADDR (0x80302000)
 typedef struct _spi_block_t {
     uint32_t interrupt_state;
     uint32_t interrupt_enable;
@@ -91,13 +94,13 @@ static void machine_spi_print(const mp_print_t *print, mp_obj_t self_in, mp_prin
     const char *name;
 
     switch ((uint32_t)self->spi_block) {
-        case 2150629376:
+        case SPI_0_ADDR:
             name = "Flash";
             break;
-        case 2150633472:
+        case SPI_1_ADDR:
             name = "LCD";
             break;
-        case 2150637568:
+        case SPI_2_ADDR:
             name = "Ethernet";
             break;
         default:
