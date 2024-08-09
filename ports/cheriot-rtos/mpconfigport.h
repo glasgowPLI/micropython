@@ -11,7 +11,7 @@ enum { SPI_MSB_FIRST, SPI_LSB_FIRST };
 
 // Use the minimal starting configuration (disables all optional features).
 #define MICROPY_CONFIG_ROM_LEVEL \
-    (MICROPY_CONFIG_ROM_LEVEL_CORE_FEATURES) // MINIMUM)
+    (MICROPY_CONFIG_ROM_LEVEL_CORE_FEATURES)     // MINIMUM)
 
 // You can disable the built-in MicroPython compiler by setting the following
 // config option to 0.  If you do this then you won't get a REPL prompt, but you
@@ -31,6 +31,8 @@ enum { SPI_MSB_FIRST, SPI_LSB_FIRST };
 #define MICROPY_PY_IO                       (0)
 #define MICROPY_PY_BUILTINS_MEMORYVIEW      (1)
 
+#define MICROPY_STREAMS_NON_BLOCK           (1)
+
 #define MICROPY_LONGINT_IMPL                (MICROPY_LONGINT_IMPL_MPZ)
 
 #define MICROPY_ALLOC_PATH_MAX              (256)
@@ -41,7 +43,9 @@ enum { SPI_MSB_FIRST, SPI_LSB_FIRST };
 #define MICROPY_PY_MACHINE_SPI              (1)
 #define MICROPY_PY_MACHINE_SPI_MSB          (SPI_MSB_FIRST)
 #define MICROPY_PY_MACHINE_SPI_LSB          (SPI_LSB_FIRST)
-
+#define MICROPY_PY_MACHINE_I2C              (1)
+#define MICROPY_PY_MACHINE_UART             (1)
+#define MICROPY_PY_MACHINE_UART_INCLUDEFILE "ports/cheriot-rtos/machine_uart.c"
 // Use the minimum headroom in the chunk allocator for parse nodes.
 #define MICROPY_ALLOC_PARSE_CHUNK_INIT      (16)
 

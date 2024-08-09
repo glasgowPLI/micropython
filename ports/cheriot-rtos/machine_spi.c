@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 #include "extmod/modmachine.h"
 #include "py/obj.h"
 #include "py/runtime.h"
@@ -15,6 +13,9 @@
 #define DEFAULT_SPI_BITS (8)
 #define DEFAULT_SPI_FIRSTBIT (SPI_MSB_FIRST)
 
+#define SPI_0_ADDR (0x80300000)
+#define SPI_1_ADDR (0x80301000)
+#define SPI_2_ADDR (0x80302000)
 typedef struct _spi_block_t {
     uint32_t interrupt_state;
     uint32_t interrupt_enable;
@@ -88,18 +89,18 @@ typedef struct _machine_spi_obj_t {
     volatile spi_block_t *spi_block;
 } machine_spi_obj_t;
 
-static void machine_spi_print(const mp_print_t *print, mp_obj_t self_in,
-    mp_print_kind_t kind) {
+static void machine_spi_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     machine_spi_obj_t *self = MP_OBJ_TO_PTR(self_in);
     const char *name;
+
     switch ((uint32_t)self->spi_block) {
-        case 2150629376:
+        case SPI_0_ADDR:
             name = "Flash";
             break;
-        case 2150633472:
+        case SPI_1_ADDR:
             name = "LCD";
             break;
-        case 2150637568:
+        case SPI_2_ADDR:
             name = "Ethernet";
             break;
         default:
@@ -268,14 +269,9 @@ static void machine_spi_transfer(mp_obj_base_t *obj, size_t len,
         uint32_t status = spi_block->status;
         if (trx && (status & STATUS_TX_FIFO_LEVEL) < 64 && tx_count < len) {
             spi_block->tx_fifo = src[tx_count];
-            printf("tx >>> %02x -- %08x\n", src[tx_count],
-                (uint32_t)&(spi_block->tx_fifo));
             tx_count++;
         } else if (rcv && (status & STATUS_RX_FIFO_LEVEL) > 0 && rx_count < len) {
             dest[rx_count] = spi_block->rx_fifo;
-            printf("rx >>> %02x -- %08x\n", dest[rx_count],
-                (uint32_t)&(spi_block->rx_fifo));
-
             rx_count++;
         }
     }
