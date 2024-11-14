@@ -36,6 +36,25 @@ bool MP_HAL_FUNC _uart_timeout_read(volatile open_titan_uart_t *block, uint8_t *
 void MP_HAL_FUNC _uart_blocking_write(volatile open_titan_uart_t *block, uint8_t data);
 
 
+#include <thread.h>
+
+static inline void mp_hal_delay_ms(mp_uint_t delay) {
+    (void)thread_millisecond_wait(delay);
+}
+
+static inline void mp_hal_delay_us(mp_uint_t delay) {
+    (void)thread_microsecond_spin(delay);
+}	
+
+#define SYSCLK_MHZ (30)
+
+extern uint32_t mp_hal_ticks_cpu(void);
+static inline mp_uint_t mp_hal_ticks_us(void) {
+    return mp_hal_ticks_cpu() / SYSCLK_MHZ;
+}
+
+
+
 #ifdef MP_VM_COMP
 #define mp_hal_stdin_rx_chr() MP_STATE_THREAD_HACK_SPILL_FOR(_mp_hal_stdin_rx_chr(), int)
 #define mp_hal_stdout_tx_str(str) MP_STATE_THREAD_HACK_SPILL_FOR_V(_mp_hal_stdout_tx_str(str))

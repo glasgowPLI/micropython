@@ -5,6 +5,7 @@ set_toolchains("cheriot-clang")
 
 -- Support libraries
 includes(path.join(sdkdir, "lib"))
+includes("../../../../compiler-rt/lib/builtins")
 
 option("board")
     set_default("sonata")

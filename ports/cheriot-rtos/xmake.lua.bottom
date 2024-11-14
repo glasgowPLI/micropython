@@ -1,7 +1,7 @@
 
 firmware("micropython")
-    add_deps("freestanding", "debug")
-    add_deps("string", "stdio")
+    add_deps("freestanding")
+    add_deps("string", "stdio", "soft_fp")
     add_deps("mp_vm", "mp_hal")
     add_deps("main")
     on_load(function(target)

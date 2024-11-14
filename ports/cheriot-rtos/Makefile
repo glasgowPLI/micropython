@@ -28,7 +28,7 @@ INC += -I$(BUILD)
 
 INC += $(SYS_INC)
 CFLAGS_CHERIOT_A7 =  -target riscv32-unknown-unknown -mcpu=cheriot -mabi=cheriot -mxcheri-rvc -mrelax -ffunction-sections -fdata-sections -fomit-frame-pointer -fno-builtin -fno-exceptions -fno-asynchronous-unwind-tables -fno-c++-static-destructors -fno-rtti 
-CFLAGS += $(INC) -Wall -Werror -std=c2x -nostdlib $(CFLAGS_CHERIOT_A7) $(COPT) -DNO_ALLOCA_H -DCHERIOT_IBEX -DIBEX -DSUNBURST -DSUNBURST_SHADOW_BASE=0x30000000 -DSUNBURST_SHADOW_SIZE=0x4000 -DCPU_TIMER_HZ=33000000 -DTICK_RATE_HZ=100 -DCHERIOT_NO_AMBIENT_MALLOC -DDEVICE_EXISTS_shadow -DDEVICE_EXISTS_clint -DDEVICE_EXISTS_uart -DDEVICE_EXISTS_gpio -DDEVICE_EXISTS_gpio -DDEVICE_EXISTS_plic -DREVOKABLE_MEMORY_START=0x00100080
+CFLAGS += $(INC) -Wall -Werror -std=c2x -nostdlib $(CFLAGS_CHERIOT_A7) $(COPT) -DNO_ALLOCA_H -DCHERIOT_IBEX -DIBEX -DSUNBURST -DSUNBURST_SHADOW_BASE=0x30000000 -DSUNBURST_SHADOW_SIZE=0x4000 -DCPU_TIMER_HZ=30000000 -DTICK_RATE_HZ=100 -DCHERIOT_NO_AMBIENT_MALLOC -DDEVICE_EXISTS_shadow -DDEVICE_EXISTS_clint -DDEVICE_EXISTS_uart -DDEVICE_EXISTS_gpio -DDEVICE_EXISTS_gpio -DDEVICE_EXISTS_plic -DREVOKABLE_MEMORY_START=0x00100080
 LDFLAGS += --script=cheriot-a7-100t.ld --relax
 
 CSUPEROPT = -Os # save some code space
@@ -49,17 +49,19 @@ LIBS =
 SRC_C = mp_entry.c \
 	shared/readline/readline.c \
 	shared/runtime/pyexec.c \
-	$(BUILD)/_frozen_mpy.c \
-	machine_pin.c \
-	machine_spi.c \
-	machine_i2c.c
+	$(SRC_LIB_LIBM_C) \
+	$(SRC_LIB_LIBM_SQRT_SW_C) \
+	#$(BUILD)/_frozen_mpy.c \
+#	machine_pin.c \
+#	machine_spi.c \
+#	machine_i2c.c \
 
-SRC_CXX = 
+SRC_CXX = machine_bitstream.cpp systick.cpp
 
-SRC_QSTR += shared/readline/readline.c shared/runtime/pyexec.c mp_entry.c machine_pin.c machine_spi.c machine_i2c.c
+SRC_QSTR += shared/readline/readline.c shared/runtime/pyexec.c mp_entry.c # machine_pin.c machine_spi.c machine_i2c.c
 
 SRC_HAL_C = shared/runtime/stdout_helpers.c
-SRC_HAL_CXX = uart_core.cpp hal/i2c.cpp hal/uart.cpp hal/timer.cpp
+SRC_HAL_CXX = uart_core.cpp # hal/i2c.cpp hal/uart.cpp hal/timer.cpp
 	
 SRC_MAIN_C =
 SRC_MAIN_CXX = main.cpp 
@@ -110,10 +112,10 @@ $(BUILD)/build/cheriot/cheriot/release/micropython: all_objects $(BUILD)/xmake.l
 #	$(CLLVM_DIR)/bin/llvm-objcopy -O binary $< - | hexdump -v -e '"%08X" "\n"' > $@
 #	echo >> $@
 
-$(BUILD)/micropython.bin: $(BUILD)/build/cheriot/cheriot/release/micropython
-	$(CLLVM_DIR)/bin/llvm-objcopy -O binary $< $@
+$(BUILD)/micropython.strip: $(BUILD)/build/cheriot/cheriot/release/micropython
+	$(CLLVM_DIR)/bin/llvm-strip $< -o $@
 
-$(BUILD)/micropython.uf2: $(BUILD)/micropython.bin
-	$(UF2CONV) $< --base 0x00101000 --output $@
+$(BUILD)/micropython.uf2: $(BUILD)/micropython.strip
+	$(UF2CONV) $< --family 0x6ce29e60 --output $@
 
 include $(TOP)/py/mkrules.mk

@@ -1,4 +1,4 @@
-#define MALLOC_QUOTA 65536
+#define MALLOC_QUOTA 0x11000
 
 #include "mp_entry.h"
 
@@ -133,6 +133,7 @@ MP_DEFINE_CONST_OBJ_TYPE(
     call, ext_callback_call);
 
 int __cheri_compartment("mp_vm") mp_exec_func_v(SObj ctx, const char *func, void *ret, int n_args, const char *sig, va_list ap) {
+#ifdef MP_EXEC_FUNC_V
     if (!func || n_args < 0 || !sig || !*sig) {
         return -1;
     }
@@ -148,8 +149,6 @@ int __cheri_compartment("mp_vm") mp_exec_func_v(SObj ctx, const char *func, void
                 break;
             #if MICROPY_PY_BUILTINS_FLOAT
             case 'f': /* float -> py`float` */
-                args[i] = mp_obj_new_float_from_f(va_arg(ap, float));
-                break;
             case 'd': /* double -> py`float` */
                 args[i] = mp_obj_new_float_from_d(va_arg(ap, double));
                 break;
@@ -197,6 +196,9 @@ int __cheri_compartment("mp_vm") mp_exec_func_v(SObj ctx, const char *func, void
         mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
         return -1;
     }
+#else
+    return -1;
+#endif
 }
 
 static mp_obj_t ext_callback_call(mp_obj_t self_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
@@ -259,6 +261,7 @@ SObj __cheri_compartment("mp_vm") mp_vminit(size_t heapsize) {
         token_obj_destroy(MALLOC_CAPABILITY, mp_ctx_key, vm_handle);
         return INVALID_SOBJ;
     }
+    printf("Heap : start 0x%08x, len 0x%x", (size_t)heap, __builtin_cheri_length_get(heap));  
     SKey okey = token_key_new();
     MP_STATE_THREAD_HACK_INIT(ctx)
     MP_STATE_VM(obj_key) = okey;
@@ -268,7 +271,7 @@ SObj __cheri_compartment("mp_vm") mp_vminit(size_t heapsize) {
     #endif
     mp_init();
     printf("Micropython initialised\n");
-    pyexec_frozen_module("_boot.py", false);
+    //pyexec_frozen_module("_boot.py", false);
     return vm_handle;
 }
 
@@ -311,8 +314,9 @@ int __cheri_compartment("mp_vm") mp_var_repl(SObj ctx) {
 }
 
 int __cheri_compartment("mp_vm") mp_exec_frozen_module(SObj ctx, const char *name) {
-    MP_STATE_THREAD_HACK_INIT(token_obj_unseal(mp_ctx_key, ctx))
-    return pyexec_frozen_module(name, false) ? 0 : -1;
+/*    MP_STATE_THREAD_HACK_INIT(token_obj_unseal(mp_ctx_key, ctx))
+    return pyexec_frozen_module(name, false) ? 0 : -1;*/
+    return -1;
 }
 
 int __cheri_compartment("mp_vm") mp_vmexit(SObj ctx) {

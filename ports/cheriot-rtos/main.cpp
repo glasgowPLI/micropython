@@ -9,7 +9,7 @@
 void __cheri_compartment("main") entry(void) {
     *MMIO_CAPABILITY(uint32_t, gpio) = 0xaa;
     printf("Test\n");
-    MicropythonContext ctx = MicropythonContext::create(0xc000).value();
+    MicropythonContext ctx = MicropythonContext::create(0xff00).value();
 #ifdef TEST_COMPARMENT_ENTRIES
     while(1) switch(mp_hal_stdin_rx_chr()) {
         #if MICROPY_ENABLE_COMPILER

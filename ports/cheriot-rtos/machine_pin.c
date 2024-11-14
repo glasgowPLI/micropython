@@ -54,7 +54,6 @@ volatile gpio_block_t *get_port(const char *drv_name) {
             if (strcmp(drv_name, "gpio") == 0) {
                 return MMIO_CAPABILITY(gpio_block_t, gpio);
             }
-        #if 0
         case 'r':
             if (strcmp(drv_name, "rpi") == 0) {
                 return MMIO_CAPABILITY(gpio_block_t, rpi);
@@ -67,7 +66,6 @@ volatile gpio_block_t *get_port(const char *drv_name) {
             if (strcmp(drv_name, "pmod") == 0) {
                 return MMIO_CAPABILITY(gpio_block_t, pmod);
             }
-        #endif
         default:
             mp_raise_msg_varg(&mp_type_ValueError,
                 MP_ERROR_TEXT("Unknown port \"%s\""), drv_name);
