@@ -2,12 +2,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <compartment.h>
+#include <platform-uart.hh>
 
 #include "mp_entry.hh"
 #include "mphalport.h"
 
 void __cheri_compartment("main") entry(void) {
-    *MMIO_CAPABILITY(uint32_t, gpio) = 0xaa;
+    *MMIO_CAPABILITY(uint32_t, gpio_board) = 0xaa;
+    auto uart = MMIO_CAPABILITY(Uart, uart);
+    uart->init(115200);
     printf("Test\n");
     MicropythonContext ctx = MicropythonContext::create(0xc000).value();
 #ifdef TEST_COMPARMENT_ENTRIES
@@ -25,7 +28,7 @@ void __cheri_compartment("main") entry(void) {
 	    if(!ctx.exec_frozen_module("frozentest.py")) continue;
 	    printf("Frozen module exited with a failure\n");
 	    return;
-	case 'e':
+/*	case 'e':
 	    if(!ctx.exec_str_file("def foo(a,b):\n print(a)\n return b*b\nprint('created function `foo`')")) {
 		std::optional<int> ret = ctx.exec_func<int>("foo", "bar", 7);
 		if(ret) {
@@ -58,7 +61,7 @@ void __cheri_compartment("main") entry(void) {
 	    } else {
 	        printf("File-mode string execution exited with a failure\n");
 		return;
-	    }
+	    } */
 	case 'q':
 	    printf("Exiting\n");
 	    return;

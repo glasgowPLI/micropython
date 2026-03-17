@@ -307,12 +307,11 @@ typedef struct _mp_state_ctx_t {
 } mp_state_ctx_t;
 
 #ifdef MICROPY_PY_STATE_THREAD_HACK
+
+#define MP_STATE_MAIN_THREAD_PTR ((mp_state_thread_t **)__builtin_cheri_address_set(__builtin_cheri_stack_get(), __builtin_cheri_top_get(__builtin_cheri_stack_get()) - sizeof(void *)))
+
 /* Hack to avoid issues with global storage of local capabilities on CHERIoT */
-#define MP_STATE_MAIN_THREAD(x) (({ \
-        mp_state_thread_t *tstate; \
-        __asm__ ("cmove %0, ctp" : "=C" (tstate) : :); \
-        tstate; \
-    })->x)
+#define MP_STATE_MAIN_THREAD(x) (*MP_STATE_MAIN_THREAD_PTR)->x
 #define MP_STATE_VM(x) (MP_STATE_MAIN_THREAD(context)->vm.x)
 #define MP_STATE_MEM(x) (MP_STATE_MAIN_THREAD(context)->mem.x)
 #define mp_state_ctx (*MP_STATE_MAIN_THREAD(context))
@@ -323,20 +322,7 @@ typedef struct _mp_state_ctx_t {
     thread_state_hack.context = ctx; \
     thread_state_hack.dict_globals = &thread_state_hack.context->vm.dict_main; \
     thread_state_hack.dict_locals = &thread_state_hack.context->vm.dict_main; \
-    __asm__ ("cmove ctp, %0" : : "C" (&thread_state_hack) :);
-#define MP_STATE_THREAD_HACK_SPILL_FOR(stat, type) ({ \
-        const mp_state_thread_t *tstate; \
-        __asm__ ("cmove %0, ctp" : "=C" (tstate) : :); \
-        type tmp = stat; \
-        __asm__ ("cmove ctp, %0" : : "C" (tstate) :); \
-        tmp; \
-    })
-#define MP_STATE_THREAD_HACK_SPILL_FOR_V(stat) ({ \
-        const mp_state_thread_t *tstate; \
-        __asm__ ("cmove %0, ctp" : "=C" (tstate) : :); \
-        stat; \
-        __asm__ ("cmove ctp, %0" : : "C" (tstate) :); \
-    })
+    (*MP_STATE_MAIN_THREAD_PTR) = &thread_state_hack;
 
 #else
 extern mp_state_ctx_t mp_state_ctx;
@@ -345,7 +331,6 @@ extern mp_state_ctx_t mp_state_ctx;
 #define MP_STATE_MEM(x) (mp_state_ctx.mem.x)
 
 #define MP_STATE_THREAD_HACK_INIT(ctx)
-#define MP_STATE_THREAD_HACK_SPILL_FOR(stat) stat
 #define MP_STATE_MAIN_THREAD(x) (mp_state_ctx.thread.x)
 #endif
 

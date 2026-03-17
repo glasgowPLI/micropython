@@ -1,7 +1,5 @@
 #define MALLOC_QUOTA 65536
 
-#include "mp_entry.h"
-
 #include "py/builtin.h"
 #include "py/compile.h"
 #include "py/runtime.h"
@@ -11,27 +9,28 @@
 #include "py/misc.h"
 #include "shared/runtime/pyexec.h"
 
+#include "mp_entry.h"
+
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
 
-
-static SKey mp_ctx_key = INVALID_SKEY;
+static TokenKey mp_ctx_key = NULL;
 
 /* We maintain a linked list of the objects we export to ensure they don't get garbage-collected */
-typedef struct obj_export_handle {
+struct obj_export_handle {
     mp_obj_t obj;
     struct obj_export_handle *next, **prevnext;
-} obj_export_handle_t;
+};
 
-MP_REGISTER_ROOT_POINTER(struct SKeyStruct *obj_key);
+MP_REGISTER_ROOT_POINTER(struct TokenKeyType *obj_key);
 MP_REGISTER_ROOT_POINTER(struct obj_export_handle *obj_export_head);
 
 /* All compartment entry points return 0 on success and -1 on failure. This is consistent with
  * the RTOS installing a return value of -1 on forced unwind */
 
 #if MICROPY_ENABLE_COMPILER
-int __cheri_compartment("mp_vm") mp_exec_str_single(SObj ctx, const char *src) {
+int __cheri_compartment("mp_vm") mp_exec_str_single(SCTX ctx, const char *src) {
     MP_STATE_THREAD_HACK_INIT(token_obj_unseal(mp_ctx_key, ctx))
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
@@ -48,7 +47,7 @@ int __cheri_compartment("mp_vm") mp_exec_str_single(SObj ctx, const char *src) {
         return -1;
     }
 }
-int __cheri_compartment("mp_vm") mp_exec_str_file(SObj ctx, const char *src) {
+int __cheri_compartment("mp_vm") mp_exec_str_file(SCTX ctx, const char *src) {
     MP_STATE_THREAD_HACK_INIT(token_obj_unseal(mp_ctx_key, ctx))
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
@@ -66,7 +65,7 @@ int __cheri_compartment("mp_vm") mp_exec_str_file(SObj ctx, const char *src) {
     }
 }
 
-int __cheri_compartment("mp_vm") mp_free_obj_handle(SObj ctx, SObj obj) {
+int __cheri_compartment("mp_vm") mp_free_obj_handle(SCTX ctx, SHANDLE obj) {
     MP_STATE_THREAD_HACK_INIT(token_obj_unseal(mp_ctx_key, ctx))
     obj_export_handle_t *handle = token_obj_unseal(MP_STATE_VM(obj_key), obj);
     if (!handle) {
@@ -102,7 +101,7 @@ static int mp_obj_to_cobj(void *ret, char type, mp_obj_t in) {
             return 0;
         case 'O': { /* TODO -- sealed python object */
             obj_export_handle_t *obj;
-            *(SObj *)ret = token_sealed_unsealed_alloc(&((Timeout) { .elapsed = 0, .remaining = UnlimitedTimeout }), MALLOC_CAPABILITY, MP_STATE_VM(obj_key), sizeof(obj_export_handle_t), (void **)&obj);
+            *(SHANDLE *)ret = token_sealed_unsealed_alloc(&((Timeout) { .elapsed = 0, .remaining = UnlimitedTimeout }), MALLOC_CAPABILITY, MP_STATE_VM(obj_key), sizeof(obj_export_handle_t), (void **)&obj);
             obj->obj = in;
             obj->next = MP_STATE_VM(obj_export_head);
             obj->prevnext = &MP_STATE_VM(obj_export_head);
@@ -132,7 +131,7 @@ MP_DEFINE_CONST_OBJ_TYPE(
     MP_TYPE_FLAG_NONE,
     call, ext_callback_call);
 
-int __cheri_compartment("mp_vm") mp_exec_func_v(SObj ctx, const char *func, void *ret, int n_args, const char *sig, va_list ap) {
+int __cheri_compartment("mp_vm") mp_exec_func_v(SCTX ctx, const char *func, void *ret, int n_args, const char *sig, va_list ap) {
     if (!func || n_args < 0 || !sig || !*sig) {
         return -1;
     }
@@ -163,7 +162,7 @@ int __cheri_compartment("mp_vm") mp_exec_func_v(SObj ctx, const char *func, void
                 args[i] = mp_obj_new_cap(va_arg(ap, void *));
                 break;
             case 'O': { /* Sealed python object */
-                obj_export_handle_t *handle = token_obj_unseal(MP_STATE_VM(obj_key), va_arg(ap, SObj));
+                obj_export_handle_t *handle = token_obj_unseal(MP_STATE_VM(obj_key), va_arg(ap, SHANDLE));
                 if (!handle) {
                     return -1;
                 }
@@ -211,7 +210,7 @@ static mp_obj_t ext_callback_call(mp_obj_t self_in, size_t n_args, size_t n_kw, 
         }
     }
 
-    mp_cb_arg_t ret = MP_STATE_THREAD_HACK_SPILL_FOR((*self->func)(self->data, cargs), mp_cb_arg_t);
+    mp_cb_arg_t ret = (*self->func)(self->data, cargs);
     m_del(mp_cb_arg_t, cargs, n_args);
 
     switch (*self->sig) {
@@ -243,23 +242,23 @@ static mp_obj_t ext_callback_call(mp_obj_t self_in, size_t n_args, size_t n_kw, 
 #endif
 
 #include <stdio.h>
-SObj __cheri_compartment("mp_vm") mp_vminit(size_t heapsize) {
-    if (mp_ctx_key == INVALID_SKEY) {
+SCTX __cheri_compartment("mp_vm") mp_vminit(size_t heapsize) {
+    if (mp_ctx_key == NULL) {
         mp_ctx_key = token_key_new();
     }
     void *ctx;
-    SObj vm_handle = token_sealed_unsealed_alloc(&((Timeout) { .elapsed = 0, .remaining = UnlimitedTimeout }), MALLOC_CAPABILITY, mp_ctx_key, sizeof(mp_state_ctx_t), &ctx);
-    if (!ctx || !vm_handle) {
+    SCTX vm_handle = token_sealed_unsealed_alloc(&((Timeout) { .elapsed = 0, .remaining = UnlimitedTimeout }), MALLOC_CAPABILITY, mp_ctx_key, sizeof(mp_state_ctx_t), &ctx);
+    if (!ctx || !(void*)vm_handle) {
         printf("Failed to init micropython VM -- context allocation failed\n");
-        return INVALID_SOBJ;
+        return NULL;
     }
     char *heap = malloc(heapsize);
     if (!heap) {
         printf("Failed to init micropython VM -- heap allocation failed\n");
         token_obj_destroy(MALLOC_CAPABILITY, mp_ctx_key, vm_handle);
-        return INVALID_SOBJ;
+        return NULL;
     }
-    SKey okey = token_key_new();
+    TokenKey okey = token_key_new();
     MP_STATE_THREAD_HACK_INIT(ctx)
     MP_STATE_VM(obj_key) = okey;
     #if MICROPY_ENABLE_GC
@@ -272,7 +271,7 @@ SObj __cheri_compartment("mp_vm") mp_vminit(size_t heapsize) {
     return vm_handle;
 }
 
-int __cheri_compartment("mp_vm") mp_vmrestart(SObj ctx) {
+int __cheri_compartment("mp_vm") mp_vmrestart(SCTX ctx) {
     MP_STATE_THREAD_HACK_INIT(token_obj_unseal(mp_ctx_key, ctx))
     mp_deinit();
     void *heap = MP_STATE_MEM(area.gc_alloc_table_start);
@@ -291,17 +290,17 @@ int __cheri_compartment("mp_vm") mp_vmrestart(SObj ctx) {
     }
 }
 
-int __cheri_compartment("mp_vm") mp_raw_repl(SObj ctx) {
+int __cheri_compartment("mp_vm") mp_raw_repl(SCTX ctx) {
     MP_STATE_THREAD_HACK_INIT(token_obj_unseal(mp_ctx_key, ctx))
     return pyexec_raw_repl();
 }
 
-int __cheri_compartment("mp_vm") mp_friendly_repl(SObj ctx) {
+int __cheri_compartment("mp_vm") mp_friendly_repl(SCTX ctx) {
     MP_STATE_THREAD_HACK_INIT(token_obj_unseal(mp_ctx_key, ctx))
     return pyexec_friendly_repl();
 }
 
-int __cheri_compartment("mp_vm") mp_var_repl(SObj ctx) {
+int __cheri_compartment("mp_vm") mp_var_repl(SCTX ctx) {
     MP_STATE_THREAD_HACK_INIT(token_obj_unseal(mp_ctx_key, ctx))
     int ret = pyexec_file_if_exists("boot.py") & PYEXEC_FORCED_EXIT;
     while (!ret) {
@@ -310,12 +309,12 @@ int __cheri_compartment("mp_vm") mp_var_repl(SObj ctx) {
     return ret;
 }
 
-int __cheri_compartment("mp_vm") mp_exec_frozen_module(SObj ctx, const char *name) {
+int __cheri_compartment("mp_vm") mp_exec_frozen_module(SCTX ctx, const char *name) {
     MP_STATE_THREAD_HACK_INIT(token_obj_unseal(mp_ctx_key, ctx))
     return pyexec_frozen_module(name, false) ? 0 : -1;
 }
 
-int __cheri_compartment("mp_vm") mp_vmexit(SObj ctx) {
+int __cheri_compartment("mp_vm") mp_vmexit(SCTX ctx) {
     MP_STATE_THREAD_HACK_INIT(token_obj_unseal(mp_ctx_key, ctx))
     printf("Exiting Micropython VM");
     mp_deinit();

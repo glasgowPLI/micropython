@@ -52,7 +52,7 @@ volatile gpio_block_t *get_port(const char *drv_name) {
     switch (drv_name[0]) {
         case 'g':
             if (strcmp(drv_name, "gpio") == 0) {
-                return MMIO_CAPABILITY(gpio_block_t, gpio);
+                return MMIO_CAPABILITY(gpio_block_t, gpio_board);
             }
         #if 0
         case 'r':
@@ -98,7 +98,7 @@ static void machine_pin_obj_init_helper(machine_pin_obj_t *self, size_t n_args, 
 
     uint32_t block = self->port->output;
 
-    if (self->port != MMIO_CAPABILITY(gpio_block_t, gpio)) {
+    if (self->port != MMIO_CAPABILITY(gpio_block_t, gpio_board)) {
         block = set_pin_enable(block, self->pin, enabled);
     }
 
@@ -165,7 +165,7 @@ static mp_uint_t pin_ioctl(mp_obj_t self_in, mp_uint_t request, uintptr_t arg, i
         }
         case MP_PIN_WRITE: {
             uint32_t block = set_pin_value(self->port->output, self->pin, (bool)arg);
-            if ((self->port != MMIO_CAPABILITY(gpio_block_t, gpio)) & (self->mode == MACHINE_PIN_MODE_OPEN_DRAIN)) {
+            if ((self->port != MMIO_CAPABILITY(gpio_block_t, gpio_board)) & (self->mode == MACHINE_PIN_MODE_OPEN_DRAIN)) {
                 block = set_pin_enable(block, self->pin, !(bool)arg);
             }
             self->port->output = block;

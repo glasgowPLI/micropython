@@ -43,7 +43,7 @@ enum { SPI_MSB_FIRST, SPI_LSB_FIRST };
 #define MICROPY_PY_MACHINE_SPI              (1)
 #define MICROPY_PY_MACHINE_SPI_MSB          (SPI_MSB_FIRST)
 #define MICROPY_PY_MACHINE_SPI_LSB          (SPI_LSB_FIRST)
-#define MICROPY_PY_MACHINE_I2C              (1)
+#define MICROPY_PY_MACHINE_I2C              (0)
 #define MICROPY_PY_MACHINE_UART             (1)
 #define MICROPY_PY_MACHINE_UART_INCLUDEFILE "ports/cheriot-rtos/machine_uart.c"
 // Use the minimum headroom in the chunk allocator for parse nodes.
@@ -63,13 +63,13 @@ typedef long mp_off_t;
 #define MICROPY_HEAP_SIZE (65536)
 #define MICROPY_MIN_USE_CHERIOT_A7 (1)
 #define alloca(size) __builtin_alloca(size)
-static __attribute__((unused)) __attribute__((always_inline)) size_t
+/*static __attribute__((unused)) __attribute__((always_inline)) size_t
 strnlen(const char *s, size_t maxlen) {
     int i = 0;
     while (*s++ && ++i < maxlen) {
     }
     return i;
-}
+}*/
 
 #define MICROPY_HW_BOARD_NAME "cheriot"
 #define MICROPY_HW_MCU_NAME "unknown-cpu"

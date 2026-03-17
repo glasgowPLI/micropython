@@ -36,28 +36,6 @@ bool MP_HAL_FUNC _uart_timeout_read(volatile open_titan_uart_t *block, uint8_t *
 void MP_HAL_FUNC _uart_blocking_write(volatile open_titan_uart_t *block, uint8_t data);
 
 
-#ifdef MP_VM_COMP
-#define mp_hal_stdin_rx_chr() MP_STATE_THREAD_HACK_SPILL_FOR(_mp_hal_stdin_rx_chr(), int)
-#define mp_hal_stdout_tx_str(str) MP_STATE_THREAD_HACK_SPILL_FOR_V(_mp_hal_stdout_tx_str(str))
-#define mp_hal_stdout_tx_strn(str, len) MP_STATE_THREAD_HACK_SPILL_FOR(_mp_hal_stdout_tx_strn(str, len), mp_uint_t)
-#define mp_hal_stdout_tx_strn_cooked(str, len) MP_STATE_THREAD_HACK_SPILL_FOR_V(_mp_hal_stdout_tx_strn_cooked(str, len))
-
-
-#define i2c_setup(i2c, freq_kHz) MP_STATE_THREAD_HACK_SPILL_FOR_V(_i2c_setup(i2c, freq_kHz))
-#define i2c_send_address(i2c, addr) MP_STATE_THREAD_HACK_SPILL_FOR(_i2c_send_address(i2c, addr), bool)
-#define i2c_blocking_read(i2c, addr, buf, len) MP_STATE_THREAD_HACK_SPILL_FOR(_i2c_blocking_read(i2c, addr, buf, len), bool)
-#define i2c_blocking_write(i2c, addr, buf, len, skipStop) MP_STATE_THREAD_HACK_SPILL_FOR(_i2c_blocking_write(i2c, addr, buf, len, skipStop), bool)
-
-
-#define uart_init(block, baudrate) MP_STATE_THREAD_HACK_SPILL_FOR_V(_uart_init(block, baudrate))
-#define uart_get_rx_level(block) MP_STATE_THREAD_HACK_SPILL_FOR(_uart_get_rx_level(block), uint8_t)
-#define uart_get_tx_level(block) MP_STATE_THREAD_HACK_SPILL_FOR(_uart_get_tx_level(block), uint8_t)
-#define uart_is_readable(block) MP_STATE_THREAD_HACK_SPILL_FOR(_uart_is_readable(block), bool)
-#define uart_is_writable(block) MP_STATE_THREAD_HACK_SPILL_FOR(_uart_is_writable(block), bool)
-#define uart_timeout_read(block, out, timeout_ms) MP_STATE_THREAD_HACK_SPILL_FOR(_uart_timeout_read(block, out, timeout_ms), bool)
-#define uart_blocking_write(block, data) MP_STATE_THREAD_HACK_SPILL_FOR_V(_uart_blocking_write(block, data))
-
-#else
 #define mp_hal_stdin_rx_chr _mp_hal_stdin_rx_chr
 #define mp_hal_stdout_tx_str _mp_hal_stdout_tx_str
 #define mp_hal_stdout_tx_strn _mp_hal_stdout_tx_strn
@@ -77,6 +55,5 @@ void MP_HAL_FUNC _uart_blocking_write(volatile open_titan_uart_t *block, uint8_t
 #define uart_is_writable _uart_is_writable
 #define uart_timeout_read _uart_timeout_read
 #define uart_blocking_write _uart_blocking_write
-#endif
 
 #endif
