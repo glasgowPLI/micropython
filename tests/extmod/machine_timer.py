@@ -1,38 +1,48 @@
-# test machine.Timer
+import sys
 
 try:
-    import time, machine as machine
-
-    machine.Timer
+    from machine import Timer
+    from time import sleep_ms
 except:
     print("SKIP")
     raise SystemExit
 
-# create and deinit
-t = machine.Timer(freq=1)
-t.deinit()
+if sys.platform in ("esp32", "esp8266", "nrf"):
+    # Software timers aren't implemented on the esp32 and esp8266 ports.
+    # The nrf port doesn't support selection of hard and soft callbacks,
+    # and only allows Timer(period=N), not Timer(freq=N).
+    print("SKIP")
+    raise SystemExit
+else:
+    timer_id = -1
 
-# deinit again
-t.deinit()
+# Test both hard and soft IRQ handlers and both one-shot and periodic
+# timers. We adjust period in tests/extmod/machine_soft_timer.py, so try
+# adjusting freq here instead. The heap should be locked in hard callbacks
+# and unlocked in soft callbacks.
 
-# create 2 and deinit
-t = machine.Timer(freq=1)
-t2 = machine.Timer(freq=1)
-t.deinit()
-t2.deinit()
 
-# create 2 and deinit in different order
-t = machine.Timer(freq=1)
-t2 = machine.Timer(freq=1)
-t2.deinit()
-t.deinit()
+def callback(t):
+    print("callback", mode[1], kind[1], freq, end=" ")
+    try:
+        allocate = bytearray(1)
+        print("unlocked")
+    except MemoryError:
+        print("locked")
 
-# create one-shot timer with callback and wait for it to print (should be just once)
-t = machine.Timer(period=1, mode=machine.Timer.ONE_SHOT, callback=lambda t: print("one-shot"))
-time.sleep_ms(5)
-t.deinit()
 
-# create periodic timer with callback and wait for it to print
-t = machine.Timer(period=4, mode=machine.Timer.PERIODIC, callback=lambda t: print("periodic"))
-time.sleep_ms(14)
-t.deinit()
+modes = [(Timer.ONE_SHOT, "one-shot"), (Timer.PERIODIC, "periodic")]
+kinds = [(False, "soft"), (True, "hard")]
+
+for mode in modes:
+    for kind in kinds:
+        for freq in 50, 25:
+            timer = Timer(
+                timer_id,
+                mode=mode[0],
+                freq=freq,
+                hard=kind[0],
+                callback=callback,
+            )
+            sleep_ms(90)
+            timer.deinit()

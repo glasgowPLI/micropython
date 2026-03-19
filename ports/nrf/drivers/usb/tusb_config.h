@@ -26,19 +26,16 @@
 #ifndef MICROPY_INCLUDED_NRF_TUSB_CONFIG_H
 #define MICROPY_INCLUDED_NRF_TUSB_CONFIG_H
 
-// Common configuration
-
-#define CFG_TUSB_MCU                OPT_MCU_NRF5X
-#define CFG_TUSB_RHPORT0_MODE       OPT_MODE_DEVICE
-
-#define CFG_TUSB_MEM_SECTION
-#define CFG_TUSB_MEM_ALIGN          TU_ATTR_ALIGNED(4)
+#include "shared/tinyusb/tusb_config.h"
 
 // Device configuration
+#define CFG_TUSB_MCU                OPT_MCU_NRF5X
 
-#define CFG_TUD_ENDOINT0_SIZE       (64)
-#define CFG_TUD_CDC                 (1)
-#define CFG_TUD_CDC_RX_BUFSIZE      (64)
-#define CFG_TUD_CDC_TX_BUFSIZE      (64)
+// TinyUSB uses newer style errata functions, but we currently don't have the
+// latest nrfx component.  So provide macros mapping the new name to the old.
+#include "nrfx_usbd_errata.h"
+#define nrf52_errata_166 nrfx_usbd_errata_166
+#define nrf52_errata_171 nrfx_usbd_errata_171
+#define nrf52_errata_187 nrfx_usbd_errata_187
 
 #endif // MICROPY_INCLUDED_NRF_TUSB_CONFIG_H

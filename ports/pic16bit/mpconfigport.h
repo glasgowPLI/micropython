@@ -43,6 +43,7 @@
 #define MICROPY_ENABLE_SOURCE_LINE  (0)
 #define MICROPY_ENABLE_DOC_STRING   (0)
 #define MICROPY_ERROR_REPORTING     (MICROPY_ERROR_REPORTING_TERSE)
+#define MICROPY_MODULE___FILE__     (0)
 #define MICROPY_PY_ASYNC_AWAIT      (0)
 #define MICROPY_PY_BUILTINS_BYTEARRAY (0)
 #define MICROPY_PY_BUILTINS_MEMORYVIEW (0)
@@ -51,7 +52,6 @@
 #define MICROPY_PY_BUILTINS_SLICE   (0)
 #define MICROPY_PY_BUILTINS_PROPERTY (0)
 #define MICROPY_PY_MICROPYTHON_MEM_INFO (1)
-#define MICROPY_PY___FILE__         (0)
 #define MICROPY_PY_GC               (1)
 #define MICROPY_PY_ARRAY            (0)
 #define MICROPY_PY_COLLECTIONS      (0)
@@ -77,11 +77,6 @@
 
 #define MICROPY_MAKE_POINTER_CALLABLE(p) ((void *)((mp_uint_t)(p)))
 
-#define UINT_FMT "%u"
-#define INT_FMT "%d"
-typedef int mp_int_t; // must be pointer size
-typedef unsigned int mp_uint_t; // must be pointer size
-
 typedef int mp_off_t;
 
 // extra builtin names to add to the global namespace
@@ -93,7 +88,3 @@ typedef int mp_off_t;
 #define MICROPY_MPHALPORT_H "pic16bit_mphal.h"
 #define MICROPY_HW_BOARD_NAME "dsPICSK"
 #define MICROPY_HW_MCU_NAME "dsPIC33"
-
-// XC16 toolchain doesn't seem to define these
-typedef int intptr_t;
-typedef unsigned int uintptr_t;

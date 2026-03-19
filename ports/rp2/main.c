@@ -26,13 +26,15 @@
 
 #include <stdio.h>
 
+#include "rp2_flash.h"
 #include "py/compile.h"
+#include "py/cstack.h"
 #include "py/runtime.h"
 #include "py/gc.h"
 #include "py/mperrno.h"
 #include "py/mphal.h"
-#include "py/stackctrl.h"
 #include "extmod/modbluetooth.h"
+#include "extmod/modmachine.h"
 #include "extmod/modnetwork.h"
 #include "shared/readline/readline.h"
 #include "shared/runtime/gchelper.h"
@@ -46,11 +48,11 @@
 #include "mpnetworkport.h"
 #include "genhdr/mpversion.h"
 #include "mp_usbd.h"
+#include "rp2_psram.h"
 
 #include "pico/stdlib.h"
 #include "pico/binary_info.h"
 #include "pico/unique_id.h"
-#include "hardware/rtc.h"
 #include "hardware/structs/rosc.h"
 #if MICROPY_PY_LWIP
 #include "lwip/init.h"
@@ -59,6 +61,13 @@
 #if MICROPY_PY_NETWORK_CYW43
 #include "lib/cyw43-driver/src/cyw43.h"
 #endif
+#if PICO_RP2040
+#include "RP2040.h" // cmsis, for PendSV_IRQn and SCB/SCB_SCR_SEVONPEND_Msk
+#elif PICO_RP2350 && PICO_ARM
+#include "RP2350.h" // cmsis, for PendSV_IRQn and SCB/SCB_SCR_SEVONPEND_Msk
+#endif
+#include "pico/aon_timer.h"
+#include "shared/timeutils/timeutils.h"
 
 extern uint8_t __StackTop, __StackBottom;
 extern uint8_t __GcHeapStart, __GcHeapEnd;
@@ -74,7 +83,25 @@ bi_decl(bi_program_feature_group_with_flags(BINARY_INFO_TAG_MICROPYTHON,
 
 int main(int argc, char **argv) {
     // This is a tickless port, interrupts should always trigger SEV.
+    #if PICO_ARM
     SCB->SCR |= SCB_SCR_SEVONPEND_Msk;
+    #endif
+
+    pendsv_init();
+    soft_timer_init();
+
+    // Set the MCU frequency and as a side effect the peripheral clock to 48 MHz.
+    set_sys_clock_khz(SYS_CLK_KHZ, false);
+
+    // Hook for setting up anything that needs to be super early in the boot-up process.
+    MICROPY_BOARD_STARTUP();
+
+    // Set the flash divisor to an appropriate value
+    rp2_flash_set_timing();
+
+    #if MICROPY_HW_ENABLE_PSRAM
+    size_t psram_size = psram_init(MICROPY_HW_PSRAM_CS_PIN);
+    #endif
 
     #if MICROPY_HW_ENABLE_UART_REPL
     bi_decl(bi_program_feature("UART REPL"))
@@ -96,23 +123,28 @@ int main(int argc, char **argv) {
     #endif
 
     // Start and initialise the RTC
-    datetime_t t = {
-        .year = 2021,
-        .month = 1,
-        .day = 1,
-        .dotw = 4, // 0 is Monday, so 4 is Friday
-        .hour = 0,
-        .min = 0,
-        .sec = 0,
-    };
-    rtc_init();
-    rtc_set_datetime(&t);
+    struct timespec ts = { 0, 0 };
+    ts.tv_sec = timeutils_seconds_since_epoch(2021, 1, 1, 0, 0, 0);
+    aon_timer_start(&ts);
     mp_hal_time_ns_set_from_rtc();
 
     // Initialise stack extents and GC heap.
-    mp_stack_set_top(&__StackTop);
-    mp_stack_set_limit(&__StackTop - &__StackBottom - 256);
+    mp_cstack_init_with_top(&__StackTop, &__StackTop - &__StackBottom);
+
+    #if MICROPY_HW_ENABLE_PSRAM
+    if (psram_size) {
+        #if MICROPY_GC_SPLIT_HEAP
+        gc_init(&__GcHeapStart, &__GcHeapEnd);
+        gc_add((void *)PSRAM_BASE, (void *)(PSRAM_BASE + psram_size));
+        #else
+        gc_init((void *)PSRAM_BASE, (void *)(PSRAM_BASE + psram_size));
+        #endif
+    } else {
+        gc_init(&__GcHeapStart, &__GcHeapEnd);
+    }
+    #else
     gc_init(&__GcHeapStart, &__GcHeapEnd);
+    #endif
 
     #if MICROPY_PY_LWIP
     // lwIP doesn't allow to reinitialise itself by subsequent calls to this function
@@ -146,6 +178,9 @@ int main(int argc, char **argv) {
     }
     #endif
 
+    // Hook for setting up anything that can wait until after other hardware features are initialised.
+    MICROPY_BOARD_EARLY_INIT();
+
     for (;;) {
 
         // Initialise MicroPython runtime.
@@ -157,7 +192,9 @@ int main(int argc, char **argv) {
         machine_pin_init();
         rp2_pio_init();
         rp2_dma_init();
+        #if MICROPY_PY_MACHINE_I2S
         machine_i2s_init0();
+        #endif
 
         #if MICROPY_PY_BLUETOOTH
         mp_bluetooth_hci_init();
@@ -207,16 +244,31 @@ int main(int argc, char **argv) {
 
     soft_reset_exit:
         mp_printf(MP_PYTHON_PRINTER, "MPY: soft reboot\n");
+
+        // Hook for resetting anything immediately following a soft reset command.
+        MICROPY_BOARD_START_SOFT_RESET();
+
         #if MICROPY_PY_NETWORK
         mod_network_deinit();
+        #endif
+        #if MICROPY_PY_MACHINE_I2S
+        machine_i2s_deinit_all();
         #endif
         rp2_dma_deinit();
         rp2_pio_deinit();
         #if MICROPY_PY_BLUETOOTH
         mp_bluetooth_deinit();
         #endif
+        #if MICROPY_PY_MACHINE_PWM
         machine_pwm_deinit_all();
+        #endif
         machine_pin_deinit();
+        #if MICROPY_PY_MACHINE_UART
+        machine_uart_deinit_all();
+        #endif
+        #if MICROPY_PY_MACHINE_I2C_TARGET
+        mp_machine_i2c_target_deinit_all();
+        #endif
         #if MICROPY_PY_THREAD
         mp_thread_deinit();
         #endif
@@ -225,8 +277,15 @@ int main(int argc, char **argv) {
         mp_usbd_deinit();
         #endif
 
+        // Hook for resetting anything right at the end of a soft reset command.
+        MICROPY_BOARD_END_SOFT_RESET();
+
         gc_sweep_all();
         mp_deinit();
+        #if MICROPY_HW_ENABLE_UART_REPL
+        setup_default_uart();
+        mp_uart_init();
+        #endif
     }
 
     return 0;

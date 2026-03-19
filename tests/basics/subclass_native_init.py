@@ -1,10 +1,43 @@
 # test subclassing a native type and overriding __init__
 
+if not hasattr(object, "__init__"):
+    print("SKIP")
+    raise SystemExit
+
 # overriding list.__init__()
 class L(list):
     def __init__(self, a, b):
         super().__init__([a, b])
 print(L(2, 3))
+
+# with keyword arguments, with star arguments and without because those use different C calls
+class D(dict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+print(D())
+print(D([('a', 1)]))
+print(D([('a', 1)], a=2, b=3))
+print(D(a=2, b=3))
+
+class D(dict):
+    def __init__(self):
+        super().__init__()
+print(D())
+
+class D(dict):
+    def __init__(self):
+        super().__init__([])
+print(D())
+
+class D(dict):
+    def __init__(self):
+        super().__init__(a=1)
+print(D())
+
+class D(dict):
+    def __init__(self):
+        super().__init__([], a=1)
+print(D())
 
 # inherits implicitly from object
 class A:

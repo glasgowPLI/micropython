@@ -28,10 +28,28 @@
 #define __NRF52_HAL
 
 #include "py/mpconfig.h"
+#include "py/ringbuf.h"
 #include <nrfx.h>
 #include "pin.h"
 #include "nrf_gpio.h"
 #include "nrfx_config.h"
+#include "shared/runtime/interrupt_char.h"
+
+// Entering a critical section.
+#ifndef BLUETOOTH_SD
+#define MICROPY_BEGIN_ATOMIC_SECTION()     disable_irq()
+#define MICROPY_END_ATOMIC_SECTION(state)  enable_irq(state)
+#endif
+
+static inline void enable_irq(mp_uint_t state) {
+    __set_PRIMASK(state);
+}
+
+static inline mp_uint_t disable_irq(void) {
+    mp_uint_t state = __get_PRIMASK();
+    __disable_irq();
+    return state;
+}
 
 typedef enum
 {
@@ -43,11 +61,17 @@ typedef enum
 
 extern const unsigned char mp_hal_status_to_errno_table[4];
 
-NORETURN void mp_hal_raise(HAL_StatusTypeDef status);
+extern ringbuf_t stdin_ringbuf;
+
+MP_NORETURN void mp_hal_raise(HAL_StatusTypeDef status);
 void mp_hal_set_interrupt_char(int c); // -1 to disable
 
 int mp_hal_stdin_rx_chr(void);
 void mp_hal_stdout_tx_str(const char *str);
+
+static inline void mp_hal_wake_main_task_from_isr(void) {
+    // Defined for tinyusb support, nothing needs to be done here.
+}
 
 void mp_hal_delay_ms(mp_uint_t ms);
 void mp_hal_delay_us(mp_uint_t us);

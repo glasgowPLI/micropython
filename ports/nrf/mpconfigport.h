@@ -59,6 +59,12 @@
 
 // options to control how MicroPython is built
 
+// Due to the use of LTO and the unknown distance between nlr.o and nlrthumb.o code,
+// MCUs using the Thumb 1 instruction set must enable this NLR long jump feature.
+#if defined(NRF51822)
+#define MICROPY_NLR_THUMB_USE_LONG_JUMP    (1)
+#endif
+
 #ifndef MICROPY_VFS
 #define MICROPY_VFS                        (CORE_FEAT)
 #endif
@@ -114,6 +120,7 @@
 #define MICROPY_ENABLE_GC           (1)
 #define MICROPY_ENABLE_FINALISER    (1)
 #define MICROPY_STACK_CHECK         (1)
+#define MICROPY_STACK_CHECK_MARGIN  (400)
 #define MICROPY_HELPER_REPL         (1)
 #define MICROPY_REPL_INFO           (1)
 #define MICROPY_REPL_AUTO_INDENT    (1)
@@ -145,7 +152,6 @@
 #define MICROPY_PY_OS_INCLUDEFILE   "ports/nrf/modules/os/modos.c"
 #define MICROPY_PY_OS_DUPTERM       (1)
 #define MICROPY_PY_OS_DUPTERM_STREAM_DETACHED_ATTACHED (1)
-#define MICROPY_PY_OS_SEP           (1)
 #define MICROPY_PY_OS_SYNC          (MICROPY_VFS)
 #define MICROPY_PY_OS_UNAME         (1)
 #define MICROPY_PY_OS_URANDOM       (MICROPY_HW_ENABLE_RNG)
@@ -153,8 +159,7 @@
 #define MICROPY_STREAMS_NON_BLOCK   (1)
 #define MICROPY_CAN_OVERRIDE_BUILTINS (1)
 #define MICROPY_USE_INTERNAL_ERRNO  (1)
-#if MICROPY_HW_USB_CDC_1200BPS_TOUCH
-#define MICROPY_HW_ENABLE_USBDEV    (1)
+#if MICROPY_HW_ENABLE_USBDEV
 #define MICROPY_ENABLE_SCHEDULER    (1)
 #define MICROPY_SCHEDULER_STATIC_NODES (1)
 #endif
@@ -177,6 +182,7 @@
 #define MICROPY_PY_MACHINE_RESET    (1)
 #define MICROPY_PY_MACHINE_BARE_METAL_FUNCS (1)
 #define MICROPY_PY_MACHINE_BOOTLOADER (1)
+#define MICROPY_PY_MACHINE_DISABLE_IRQ_ENABLE_IRQ (1)
 #define MICROPY_PY_MACHINE_PULSE    (0)
 #define MICROPY_PY_MACHINE_SOFTI2C  (MICROPY_PY_MACHINE_I2C)
 
@@ -226,6 +232,10 @@
 #define MICROPY_PY_MACHINE_UART_INCLUDEFILE "ports/nrf/modules/machine/uart.c"
 #define MICROPY_PY_MACHINE_UART_READCHAR_WRITECHAR (1)
 
+#if defined(NRF52840)
+#define MICROPY_PY_MACHINE_UART_IRQ  (1)
+#endif
+
 #ifndef MICROPY_PY_MACHINE_TIMER_NRF
 #define MICROPY_PY_MACHINE_TIMER_NRF (1)
 #endif
@@ -255,6 +265,7 @@
 #define MICROPY_ERROR_REPORTING               (2)
 #define MICROPY_FULL_CHECKS                   (1)
 #define MICROPY_GC_ALLOC_THRESHOLD            (1)
+#define MICROPY_MODULE___FILE__               (1)
 #define MICROPY_MODULE_GETATTR                (1)
 #define MICROPY_MULTIPLE_INHERITANCE          (1)
 #define MICROPY_PY_ARRAY                      (1)
@@ -279,9 +290,7 @@
 #define MICROPY_PY_GENERATOR_PEND_THROW       (1)
 #define MICROPY_PY_MATH                       (1)
 #define MICROPY_PY_STRUCT                     (1)
-#define MICROPY_PY_SYS                        (1)
 #define MICROPY_PY_SYS_PATH_ARGV_DEFAULTS     (1)
-#define MICROPY_PY___FILE__                   (1)
 #endif
 
 #ifndef MICROPY_PY_UBLUEPY
@@ -292,18 +301,42 @@
 #define MICROPY_PY_BLE_NUS                       (0)
 #endif
 
+// Whether to enable the REPL on a UART.
+#ifndef MICROPY_HW_ENABLE_UART_REPL
+// note: if both uart repl and cdc are enabled, uart hwfc can cause the cdc to lock up.
+#define MICROPY_HW_ENABLE_UART_REPL (!MICROPY_PY_BLE_NUS && !MICROPY_HW_USB_CDC)
+#endif
+
+#if MICROPY_HW_ENABLE_UART_REPL
+
+#ifndef MICROPY_HW_UART_REPL
+#define MICROPY_HW_UART_REPL (0)
+#endif
+
+#ifndef MICROPY_HW_UART_REPL_BAUD
+#define MICROPY_HW_UART_REPL_BAUD (115200)
+#endif
+
+#endif
+
 // type definitions for the specific machine
 
-#define MICROPY_MAKE_POINTER_CALLABLE(p) ((void *)((mp_uint_t)(p) | 1))
+#if defined(NRF52832) || defined(NRF52840)
+// On nRF52, the physical SRAM is mapped to 0x20000000 for data access and 0x00800000
+// for instruction access.  So convert addresses to make them executable.
+#define MICROPY_PERSISTENT_CODE_TRACK_FUN_DATA (1)
+#define MICROPY_PERSISTENT_CODE_TRACK_BSS_RODATA (0)
+#define MICROPY_MAKE_POINTER_CALLABLE(p) ((void *)(((uintptr_t)(p) - 0x20000000 + 0x00800000) | 1))
+void *nrf_native_code_commit(void *, unsigned int, void *);
+#define MP_PLAT_COMMIT_EXEC(buf, len, reloc) nrf_native_code_commit(buf, len, reloc)
+#else
+#define MICROPY_MAKE_POINTER_CALLABLE(p) ((void *)((uintptr_t)(p) | 1))
+#endif
 
 #define MP_SSIZE_MAX (0x7fffffff)
 
-#define UINT_FMT "%u"
-#define INT_FMT "%d"
 #define HEX2_FMT "%02x"
 
-typedef int mp_int_t; // must be pointer size
-typedef unsigned int mp_uint_t; // must be pointer size
 typedef long mp_off_t;
 
 #if MICROPY_HW_ENABLE_RNG
@@ -326,16 +359,21 @@ long unsigned int rng_generate_random_word(void);
 
 #define MP_STATE_PORT MP_STATE_VM
 
-#if MICROPY_HW_USB_CDC
-#include "device/usbd.h"
-#define MICROPY_HW_USBDEV_TASK_HOOK extern void tud_task(void); tud_task();
-#else
-#define MICROPY_HW_USBDEV_TASK_HOOK ;
+#if MICROPY_HW_ENABLE_USBDEV
+#ifndef MICROPY_HW_USB_CDC
+#define MICROPY_HW_USB_CDC (1)
 #endif
+
+#ifndef MICROPY_HW_USB_VID
+#define MICROPY_HW_USB_VID  (0xf055)
+#endif
+#ifndef MICROPY_HW_USB_PID
+#define MICROPY_HW_USB_PID  (0x9802)
+#endif
+#endif // MICROPY_HW_ENABLE_USBDEV
 
 #define MICROPY_EVENT_POLL_HOOK \
     do { \
-        MICROPY_HW_USBDEV_TASK_HOOK \
         extern void mp_handle_pending(bool); \
         mp_handle_pending(true); \
         __WFI(); \

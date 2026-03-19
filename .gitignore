@@ -11,8 +11,9 @@ build/
 build-*/
 docs/genrst/
 
-# Test failure outputs
+# Test failure outputs and intermediate artefacts
 tests/results/*
+tests/ports/unix/ffi_lib.so
 
 # Python cache files
 __pycache__/
@@ -23,3 +24,11 @@ user.props
 
 # MacOS desktop metadata files
 .DS_Store
+
+# Created by ci.sh zephyr targets
+/.ccache
+/zephyrproject
+
+# Created by ci.sh esp8266 targets
+/xtensa-lx106-elf-standalone.tar.gz
+/xtensa-lx106-elf/

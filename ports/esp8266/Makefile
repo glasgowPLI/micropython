@@ -16,6 +16,12 @@ endif
 $(error Invalid BOARD specified: $(BOARD_DIR))
 endif
 
+ifneq ($(BOARD_VARIANT),)
+ifeq ($(wildcard $(BOARD_DIR)/mpconfigvariant_$(BOARD_VARIANT).mk),)
+$(error Invalid BOARD_VARIANT specified: $(BOARD_VARIANT))
+endif
+endif
+
 # If the build directory is not given, make it reflect the board name (and
 # optionally the board variant).
 ifneq ($(BOARD_VARIANT),)
@@ -26,8 +32,13 @@ endif
 
 include ../../py/mkenv.mk
 
-# Optional
--include $(BOARD_DIR)/mpconfigboard.mk
+# Include board specific .mk file, and optional board variant .mk file.
+include $(BOARD_DIR)/mpconfigboard.mk
+ifeq ($(BOARD_VARIANT),)
+-include $(BOARD_DIR)/mpconfigvariant.mk
+else
+include $(BOARD_DIR)/mpconfigvariant_$(BOARD_VARIANT).mk
+endif
 
 # qstr definitions (must come before including py.mk)
 QSTR_DEFS = qstrdefsport.h #$(BUILD)/pins_qstr.h
@@ -123,6 +134,7 @@ SRC_C = \
 	fatfs_port.c \
 	posix_helpers.c \
 	hspi.c \
+	vfs_rom_ioctl.c \
 	$(wildcard $(BOARD_DIR)/*.c) \
 
 ifeq ($(MICROPY_PY_ESPNOW),1)
@@ -174,6 +186,11 @@ else ifneq ($(shell cat $(CONFVARS_FILE)), $(FROZEN_MANIFEST) $(UART_OS))
 $(shell echo $(FROZEN_MANIFEST) $(UART_OS) > $(CONFVARS_FILE))
 endif
 
+ESPTOOL := $(shell command -v esptool 2> /dev/null)
+ifndef ESPTOOL
+ESPTOOL = esptool.py
+endif
+
 $(BUILD)/uart.o: $(CONFVARS_FILE)
 
 FROZEN_EXTRA_DEPS = $(CONFVARS_FILE)
@@ -182,11 +199,11 @@ FROZEN_EXTRA_DEPS = $(CONFVARS_FILE)
 
 deploy: $(FWBIN)
 	$(ECHO) "Writing $< to the board"
-	$(Q)esptool.py --port $(PORT) --baud $(BAUD) write_flash --verify --flash_size=$(FLASH_SIZE) --flash_mode=$(FLASH_MODE) 0 $<
+	$(Q)$(ESPTOOL) --port $(PORT) --baud $(BAUD) write_flash --verify --flash_size=$(FLASH_SIZE) --flash_mode=$(FLASH_MODE) 0 $<
 
 erase:
 	$(ECHO) "Erase flash"
-	$(Q)esptool.py --port $(PORT) --baud $(BAUD) erase_flash
+	$(Q)$(ESPTOOL) --port $(PORT) --baud $(BAUD) erase_flash
 
 reset:
 	echo -e "\r\nimport machine; machine.reset()\r\n" >$(PORT)
@@ -194,7 +211,7 @@ reset:
 ifeq ($(BOARD_VARIANT),OTA)
 $(FWBIN): $(BUILD)/firmware.elf
 	$(ECHO) "Create $@"
-	$(Q)esptool.py elf2image $^
+	$(Q)$(ESPTOOL) elf2image $^
 	$(Q)$(PYTHON) makeimg.py $(BUILD)/firmware.elf-0x00000.bin $(BUILD)/firmware.elf-0x[0-5][1-f]000.bin $(BUILD)/firmware-ota.bin
 
 	$(Q)cat $(YAOTA8266)/yaota8266.bin $(BUILD)/firmware-ota.bin > $@
@@ -202,7 +219,7 @@ $(FWBIN): $(BUILD)/firmware.elf
 else
 $(FWBIN): $(BUILD)/firmware.elf
 	$(ECHO) "Create $@"
-	$(Q)esptool.py elf2image $^
+	$(Q)$(ESPTOOL) elf2image $^
 	$(Q)$(PYTHON) makeimg.py $(BUILD)/firmware.elf-0x00000.bin $(BUILD)/firmware.elf-0x[0-5][1-f]000.bin $@
 endif
 

@@ -32,7 +32,6 @@
 
 #define DEBUG_printf(...) // printf("nimble (esp32): " __VA_ARGS__)
 
-#include "esp_nimble_hci.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 
@@ -45,14 +44,13 @@ static void ble_host_task(void *param) {
 }
 
 void mp_bluetooth_nimble_port_hci_init(void) {
-    DEBUG_printf("mp_bluetooth_nimble_port_hci_init\n");
-    esp_nimble_hci_init();
+    // On ESP-IDF the standard nimble_port_init() function calls
+    // esp_nimble_init() which initialises the HCI
 }
 
 void mp_bluetooth_nimble_port_hci_deinit(void) {
-    DEBUG_printf("mp_bluetooth_nimble_port_hci_deinit\n");
-
-    esp_nimble_hci_deinit();
+    // As above, this is handled by ESP-IDF nimble_port_deinit()
+    // (called below)
 }
 
 void mp_bluetooth_nimble_port_start(void) {
@@ -60,7 +58,7 @@ void mp_bluetooth_nimble_port_start(void) {
     nimble_port_freertos_init(ble_host_task);
 }
 
-void mp_bluetooth_nimble_port_shutdown(void) {
+int mp_bluetooth_nimble_port_shutdown(void) {
     DEBUG_printf("mp_bluetooth_nimble_port_shutdown\n");
 
     #if MICROPY_PY_BLUETOOTH_USE_SYNC_EVENTS_WITH_INTERLOCK
@@ -81,6 +79,8 @@ void mp_bluetooth_nimble_port_shutdown(void) {
 
     // Mark stack as shutdown.
     mp_bluetooth_nimble_ble_state = MP_BLUETOOTH_NIMBLE_BLE_STATE_OFF;
+
+    return 0;
 }
 
 #endif

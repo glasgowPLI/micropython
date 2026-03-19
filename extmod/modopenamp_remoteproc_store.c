@@ -26,7 +26,7 @@
  * OpenAMP's remoteproc store.
  */
 
-#if MICROPY_PY_OPENAMP_REMOTEPROC
+#if MICROPY_PY_OPENAMP_HOST && MICROPY_PY_OPENAMP_REMOTEPROC
 
 #include "py/obj.h"
 #include "py/nlr.h"
@@ -46,8 +46,6 @@
 #include "modopenamp_remoteproc.h"
 
 #if MICROPY_PY_OPENAMP_REMOTEPROC_STORE_ENABLE
-
-#define DEBUG_printf(...)   // mp_printf(&mp_plat_print, __VA_ARGS__)
 
 // Note the initial file buffer size needs to be at least 512 to read
 // enough of the elf headers on the first call to store_open(), and on
@@ -70,14 +68,15 @@ void *mp_openamp_remoteproc_store_alloc(void) {
 }
 
 static int openamp_remoteproc_store_open(void *store, const char *path, const void **image_data) {
-    DEBUG_printf("store_open(): %s\n", path);
+    metal_log(METAL_LOG_DEBUG, "store_open(): %s\n", path);
     mp_obj_t args[2] = {
-        mp_obj_new_str(path, strlen(path)),
+        mp_obj_new_str_from_cstr(path),
         MP_OBJ_NEW_QSTR(MP_QSTR_rb),
     };
 
     openamp_remoteproc_filestore_t *fstore = store;
     fstore->file = mp_vfs_open(MP_ARRAY_SIZE(args), args, (mp_map_t *)&mp_const_empty_map);
+    (void)mp_get_stream_raise(fstore->file, MP_STREAM_OP_READ);
 
     int error = 0;
     mp_uint_t bytes = mp_stream_read_exactly(fstore->file, fstore->buf, RPROC_FILE_STORE_BUF_SIZE, &error);
@@ -89,7 +88,7 @@ static int openamp_remoteproc_store_open(void *store, const char *path, const vo
 }
 
 static void openamp_remoteproc_store_close(void *store) {
-    DEBUG_printf("store_close()\n");
+    metal_log(METAL_LOG_DEBUG, "store_close()\n");
     openamp_remoteproc_filestore_t *fstore = store;
     mp_stream_close(fstore->file);
     metal_free_memory(fstore->buf);
@@ -113,17 +112,17 @@ static int openamp_remoteproc_store_load(void *store, size_t offset, size_t size
             // Note tracked allocs don't support realloc.
             fstore->len = size;
             fstore->buf = metal_allocate_memory(size);
-            DEBUG_printf("store_load() realloc to %lu\n", fstore->len);
+            metal_log(METAL_LOG_DEBUG, "store_load() realloc to %lu\n", fstore->len);
         }
         *data = fstore->buf;
-        DEBUG_printf("store_load(): pa 0x%lx offset %u size %u \n", (uint32_t)pa, offset, size);
+        metal_log(METAL_LOG_DEBUG, "store_load(): pa 0x%lx offset %u size %u \n", (uint32_t)pa, offset, size);
     } else {
         void *va = metal_io_phys_to_virt(io, pa);
         if (va == NULL) {
             return -EINVAL;
         }
         *data = va;
-        DEBUG_printf("store_load(): pa 0x%lx va 0x%p offset %u size %u \n", (uint32_t)pa, va, offset, size);
+        metal_log(METAL_LOG_DEBUG, "store_load(): pa 0x%lx va 0x%p offset %u size %u \n", (uint32_t)pa, va, offset, size);
     }
 
     mp_uint_t bytes = mp_stream_read_exactly(fstore->file, (void *)*data, size, &error);
@@ -143,4 +142,4 @@ const struct image_store_ops openamp_remoteproc_store_ops = {
 
 #endif // MICROPY_PY_OPENAMP_REMOTEPROC_STORE_ENABLE
 
-#endif // MICROPY_PY_OPENAMP_REMOTEPROC
+#endif // MICROPY_PY_OPENAMP_HOST && MICROPY_PY_OPENAMP_REMOTEPROC

@@ -579,17 +579,18 @@ static const mp_rom_map_elem_t pyb_uart_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_txdone),      MP_ROM_PTR(&machine_uart_txdone_obj) },
 
     /// \method read([nbytes])
-    { MP_ROM_QSTR(MP_QSTR_read),        MP_ROM_PTR(&mp_stream_read_obj) },
+    { MP_ROM_QSTR(MP_QSTR_read),        MP_ROM_PTR(&mp_stream_read1_obj) },
     /// \method readline()
     { MP_ROM_QSTR(MP_QSTR_readline),    MP_ROM_PTR(&mp_stream_unbuffered_readline_obj) },
     /// \method readinto(buf[, nbytes])
-    { MP_ROM_QSTR(MP_QSTR_readinto),    MP_ROM_PTR(&mp_stream_readinto_obj) },
+    { MP_ROM_QSTR(MP_QSTR_readinto),    MP_ROM_PTR(&mp_stream_readinto1_obj) },
     /// \method write(buf)
-    { MP_ROM_QSTR(MP_QSTR_write),       MP_ROM_PTR(&mp_stream_write_obj) },
+    { MP_ROM_QSTR(MP_QSTR_write),       MP_ROM_PTR(&mp_stream_write1_obj) },
     { MP_ROM_QSTR(MP_QSTR_flush),       MP_ROM_PTR(&mp_stream_flush_obj) },
 
     // class constants
     { MP_ROM_QSTR(MP_QSTR_RX_ANY),      MP_ROM_INT(UART_TRIGGER_RX_ANY) },
+    { MP_ROM_QSTR(MP_QSTR_IRQ_RX),      MP_ROM_INT(UART_TRIGGER_RX_ANY) },
 };
 
 static MP_DEFINE_CONST_DICT(pyb_uart_locals_dict, pyb_uart_locals_dict_table);

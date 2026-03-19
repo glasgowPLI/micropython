@@ -15,7 +15,10 @@
 #include <stdint.h>
 #include <math.h>
 
-#define FLT_EVAL_METHOD 0
+// These lines verify that FLT_EVAL_METHOD==0, MicroPython's libm requires this.
+// If compilation fails here then check the host compiler's FLT_EVAL_METHOD.
+typedef float float_t;
+typedef double double_t;
 
 #define FORCE_EVAL(x) do {                        \
 	if (sizeof(x) == sizeof(float)) {         \
@@ -86,7 +89,9 @@ do {                                              \
   (d) = __u.f;                                    \
 } while (0)
 
+#if !defined(DBL_EPSILON)
 #define DBL_EPSILON 2.22044604925031308085e-16
+#endif
 
 int __rem_pio2(double, double*);
 int __rem_pio2_large(double*, double*, int, int, int);

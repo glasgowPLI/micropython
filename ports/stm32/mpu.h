@@ -28,7 +28,7 @@
 
 #include "irq.h"
 
-#if (defined(STM32F4) && defined(MICROPY_HW_ETH_MDC)) || defined(STM32F7) || defined(STM32H7) || defined(STM32WB)
+#if (defined(STM32F4) && defined(MICROPY_HW_ETH_MDC)) || defined(STM32F469xx) || defined(STM32F7) || defined(STM32G4) || defined(STM32H7) || defined(STM32WB)
 
 #define MPU_REGION_ETH      (MPU_REGION_NUMBER0)
 #define MPU_REGION_QSPI1    (MPU_REGION_NUMBER1)
@@ -36,11 +36,17 @@
 #define MPU_REGION_QSPI3    (MPU_REGION_NUMBER3)
 #define MPU_REGION_SDRAM1   (MPU_REGION_NUMBER4)
 #define MPU_REGION_SDRAM2   (MPU_REGION_NUMBER5)
-#define MPU_REGION_OPENAMP  (MPU_REGION_NUMBER15)
 
 // Only relevant on CPUs with D-Cache, must be higher priority than SDRAM
 #define MPU_REGION_DMA_UNCACHED_1 (MPU_REGION_NUMBER6)
 #define MPU_REGION_DMA_UNCACHED_2 (MPU_REGION_NUMBER7)
+
+#ifdef MPU_REGION_NUMBER8
+#define MPU_REGION_OPENAMP  (MPU_REGION_NUMBER8)
+#define MPU_REGION_LAST_USED (MPU_REGION_NUMBER8)
+#else
+#define MPU_REGION_LAST_USED (MPU_REGION_NUMBER7)
+#endif
 
 // Attribute value to disable a region entirely, remove it from the MPU
 // (i.e. the MPU_REGION_ENABLE bit is unset.)
@@ -131,17 +137,26 @@ static inline void mpu_config_end(uint32_t irq_state) {
     enable_irq(irq_state);
 }
 
-#elif defined(STM32H5)
+#elif defined(STM32H5) || defined(STM32N6)
 
 #define MPU_REGION_SIG      (MPU_REGION_NUMBER0)
 #define MPU_REGION_ETH      (MPU_REGION_NUMBER1)
+#define MPU_REGION_DMA_UNCACHED_1 (MPU_REGION_NUMBER2)
+#define MPU_REGION_DMA_UNCACHED_2 (MPU_REGION_NUMBER3)
+#define MPU_REGION_LAST_USED (MPU_REGION_NUMBER3)
 
 #define ST_DEVICE_SIGNATURE_BASE (0x08fff800)
 #define ST_DEVICE_SIGNATURE_LIMIT (0x08ffffff)
 
 // STM32H5 Cortex-M33 MPU works differently from older cores.
 // Macro only takes region size in bytes, Attributes are coded in mpu_config_region().
+#define MPU_CONFIG_DISABLE (0)
 #define MPU_CONFIG_ETH(size) (size)
+#define MPU_CONFIG_UNCACHED(size) (size)
+
+#if defined(STM32N6)
+#define MPU_REGION_SIZE_32B (32)
+#endif
 
 static inline void mpu_init(void) {
     // Configure attribute 0, inner-outer non-cacheable (=0x44).
@@ -173,8 +188,12 @@ static inline uint32_t mpu_config_start(void) {
 }
 
 static inline void mpu_config_region(uint32_t region, uint32_t base_addr, uint32_t size) {
-    if (region == MPU_REGION_ETH) {
-        // Configure region 1 to make DMA memory non-cacheable.
+    if (size == 0) {
+        // Disable MPU for this region.
+        MPU->RNR = region;
+        MPU->RLAR &= ~MPU_RLAR_EN_Msk;
+    } else if (region == MPU_REGION_ETH || region == MPU_REGION_DMA_UNCACHED_1 || region == MPU_REGION_DMA_UNCACHED_2) {
+        // Configure region to make DMA memory non-cacheable.
 
         __DMB();
         // Configure attribute 1, inner-outer non-cacheable (=0x44).

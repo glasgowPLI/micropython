@@ -26,7 +26,7 @@
  * OpenAMP's remoteproc class.
  */
 
-#if MICROPY_PY_OPENAMP_REMOTEPROC
+#if MICROPY_PY_OPENAMP_HOST && MICROPY_PY_OPENAMP_REMOTEPROC
 
 #include "py/obj.h"
 #include "py/nlr.h"
@@ -45,8 +45,6 @@
 
 #include "modopenamp.h"
 #include "modopenamp_remoteproc.h"
-
-#define DEBUG_printf(...)   // mp_printf(&mp_plat_print, __VA_ARGS__)
 
 #if !MICROPY_PY_OPENAMP
 #error "MICROPY_PY_OPENAMP_REMOTEPROC requires MICROPY_PY_OPENAMP"
@@ -139,7 +137,7 @@ mp_obj_t openamp_remoteproc_make_new(const mp_obj_type_t *type, size_t n_args, s
     }
 
     if (mp_obj_is_int(args[ARG_entry].u_obj)) {
-        self->rproc.bootaddr = mp_obj_get_int(args[ARG_entry].u_obj);
+        self->rproc.bootaddr = mp_obj_int_get_truncated(args[ARG_entry].u_obj);
     } else {
         #if MICROPY_PY_OPENAMP_REMOTEPROC_ELFLD_ENABLE
         // Load firmware.
@@ -172,4 +170,4 @@ MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &openamp_remoteproc_dict
     );
 
-#endif // MICROPY_PY_OPENAMP_REMOTEPROC
+#endif // MICROPY_PY_OPENAMP_HOST && MICROPY_PY_OPENAMP_REMOTEPROC

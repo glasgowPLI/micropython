@@ -44,6 +44,8 @@
 #define ENABLE_SPECIAL_ACCESSORS \
     (MICROPY_PY_DESCRIPTORS || MICROPY_PY_DELATTR_SETATTR || MICROPY_PY_BUILTINS_PROPERTY)
 
+static mp_obj_t mp_obj_new_type(qstr name, mp_obj_t bases_tuple, mp_obj_t locals_dict);
+static mp_obj_t mp_obj_is_subclass(mp_obj_t object, mp_obj_t classinfo);
 static mp_obj_t static_class_method_make_new(const mp_obj_type_t *self_in, size_t n_args, size_t n_kw, const mp_obj_t *args);
 
 /******************************************************************************/
@@ -82,16 +84,16 @@ static int instance_count_native_bases(const mp_obj_type_t *type, const mp_obj_t
     }
 }
 
-// This wrapper function is allows a subclass of a native type to call the
+// This wrapper function allows a subclass of a native type to call the
 // __init__() method (corresponding to type->make_new) of the native type.
-static mp_obj_t native_base_init_wrapper(size_t n_args, const mp_obj_t *args) {
+static mp_obj_t native_base_init_wrapper(size_t n_args, const mp_obj_t *args, mp_map_t *kw_args) {
     mp_obj_instance_t *self = MP_OBJ_TO_PTR(args[0]);
     const mp_obj_type_t *native_base = NULL;
     instance_count_native_bases(self->base.type, &native_base);
-    self->subobj[0] = MP_OBJ_TYPE_GET_SLOT(native_base, make_new)(native_base, n_args - 1, 0, args + 1);
+    self->subobj[0] = MP_OBJ_TYPE_GET_SLOT(native_base, make_new)(native_base, n_args - 1, kw_args->used, args + 1);
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(native_base_init_wrapper_obj, 1, MP_OBJ_FUN_ARGS_MAX, native_base_init_wrapper);
+static MP_DEFINE_CONST_FUN_OBJ_KW(native_base_init_wrapper_obj, 1, native_base_init_wrapper);
 
 #if !MICROPY_CPYTHON_COMPAT
 static
@@ -170,6 +172,12 @@ static void mp_obj_class_lookup(struct class_lookup_data *lookup, const mp_obj_t
                     if (obj != NULL && mp_obj_is_native_type(type) && type != &mp_type_object /* object is not a real type */) {
                         // If we're dealing with native base class, then it applies to native sub-object
                         obj_obj = obj->subobj[0];
+                        #if MICROPY_BUILTIN_METHOD_CHECK_SELF_ARG
+                        if (obj_obj == MP_OBJ_FROM_PTR(&native_base_init_wrapper_obj)) {
+                            // But we shouldn't attempt lookups on object that is not yet instantiated.
+                            mp_raise_msg(&mp_type_AttributeError, MP_ERROR_TEXT("call super().__init__() first"));
+                        }
+                        #endif // MICROPY_BUILTIN_METHOD_CHECK_SELF_ARG
                     } else {
                         obj_obj = MP_OBJ_FROM_PTR(obj);
                     }
@@ -653,6 +661,13 @@ static void mp_obj_instance_load_attr(mp_obj_t self_in, qstr attr, mp_obj_t *des
 
     // try __getattr__
     if (attr != MP_QSTR___getattr__) {
+        #if MICROPY_PY_DESCRIPTORS
+        // With descriptors enabled, don't delegate lookups of __get__/__set__/__delete__/__set_name__.
+        if (attr == MP_QSTR___get__ || attr == MP_QSTR___set__ || attr == MP_QSTR___delete__ || attr == MP_QSTR___set_name__) {
+            return;
+        }
+        #endif
+
         #if MICROPY_PY_DELATTR_SETATTR
         // If the requested attr is __setattr__/__delattr__ then don't delegate the lookup
         // to __getattr__.  If we followed CPython's behaviour then __setattr__/__delattr__
@@ -946,7 +961,7 @@ static bool check_for_special_accessors(mp_obj_t key, mp_obj_t value) {
     #endif
     #if MICROPY_PY_DESCRIPTORS
     static const uint8_t to_check[] = {
-        MP_QSTR___get__, MP_QSTR___set__, MP_QSTR___delete__,
+        MP_QSTR___get__, MP_QSTR___set__, MP_QSTR___delete__, // not needed for MP_QSTR___set_name__ though
     };
     for (size_t i = 0; i < MP_ARRAY_SIZE(to_check); ++i) {
         mp_obj_t dest_temp[2];
@@ -960,10 +975,52 @@ static bool check_for_special_accessors(mp_obj_t key, mp_obj_t value) {
 }
 #endif
 
+#if MICROPY_PY_DESCRIPTORS
+// Shared data layout for the __set_name__ call and a linked list of calls to be made.
+typedef union _setname_list_t setname_list_t;
+union _setname_list_t {
+    mp_obj_t call[4];
+    struct {
+        mp_obj_t _meth;
+        mp_obj_t _self;
+        setname_list_t *next; // can use the "owner" argument position temporarily for the linked list
+        mp_obj_t _name;
+    };
+};
+
+// Append any `__set_name__` method on `value` to the setname list, with its per-attr args
+static setname_list_t *setname_maybe_bind_append(setname_list_t *tail, mp_obj_t name, mp_obj_t value) {
+    // make certain our type-punning is safe:
+    MP_STATIC_ASSERT_NONCONSTEXPR(offsetof(setname_list_t, next) == offsetof(setname_list_t, call[2]));
+
+    // tail is a blank list entry
+    mp_load_method_maybe(value, MP_QSTR___set_name__, tail->call);
+    if (tail->call[1] != MP_OBJ_NULL) {
+        // Each time a __set_name__ is found, leave it in-place in the former tail and allocate a new tail
+        tail->next = m_new_obj(setname_list_t);
+        tail->next->next = NULL;
+        tail->call[3] = name;
+        return tail->next;
+    } else {
+        return tail;
+    }
+}
+
+// Execute the captured `__set_name__` calls, destroying the setname list in the process.
+static inline void setname_consume_call_all(setname_list_t *head, mp_obj_t owner) {
+    setname_list_t *next;
+    while ((next = head->next) != NULL) {
+        head->call[2] = owner;
+        mp_call_method_n_kw(2, 0, head->call);
+        head = next;
+    }
+}
+#endif
+
 static void type_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t kind) {
     (void)kind;
     mp_obj_type_t *self = MP_OBJ_TO_PTR(self_in);
-    mp_printf(print, "<class '%q'>", self->name);
+    mp_printf(print, "<class '%q'>", (qstr)self->name);
 }
 
 static mp_obj_t type_make_new(const mp_obj_type_t *type_in, size_t n_args, size_t n_kw, const mp_obj_t *args) {
@@ -1108,7 +1165,7 @@ MP_DEFINE_CONST_OBJ_TYPE(
     attr, type_attr
     );
 
-mp_obj_t mp_obj_new_type(qstr name, mp_obj_t bases_tuple, mp_obj_t locals_dict) {
+static mp_obj_t mp_obj_new_type(qstr name, mp_obj_t bases_tuple, mp_obj_t locals_dict) {
     // Verify input objects have expected type
     if (!mp_obj_is_type(bases_tuple, &mp_type_tuple)) {
         mp_raise_TypeError(NULL);
@@ -1196,20 +1253,38 @@ mp_obj_t mp_obj_new_type(qstr name, mp_obj_t bases_tuple, mp_obj_t locals_dict) 
         }
     }
 
+    #if MICROPY_PY_DESCRIPTORS
+    // To avoid any dynamic allocations when no __set_name__ exists,
+    // the head of this list is kept on the stack (marked blank with `next = NULL`).
+    setname_list_t setname_list = { .next = NULL };
+    setname_list_t *setname_tail = &setname_list;
+    #endif
+
     #if ENABLE_SPECIAL_ACCESSORS
-    // Check if the class has any special accessor methods
-    if (!(o->flags & MP_TYPE_FLAG_HAS_SPECIAL_ACCESSORS)) {
-        for (size_t i = 0; i < locals_ptr->map.alloc; i++) {
-            if (mp_map_slot_is_filled(&locals_ptr->map, i)) {
-                const mp_map_elem_t *elem = &locals_ptr->map.table[i];
-                if (check_for_special_accessors(elem->key, elem->value)) {
-                    o->flags |= MP_TYPE_FLAG_HAS_SPECIAL_ACCESSORS;
-                    break;
-                }
+    // Check if the class has any special accessor methods,
+    // and accumulate bound __set_name__ methods that need to be called
+    for (size_t i = 0; i < locals_ptr->map.alloc; i++) {
+        #if !MICROPY_PY_DESCRIPTORS
+        // __set_name__ needs to scan the entire locals map, can't early-terminate
+        if (o->flags & MP_TYPE_FLAG_HAS_SPECIAL_ACCESSORS) {
+            break;
+        }
+        #endif
+
+        if (mp_map_slot_is_filled(&locals_ptr->map, i)) {
+            const mp_map_elem_t *elem = &locals_ptr->map.table[i];
+
+            if (!(o->flags & MP_TYPE_FLAG_HAS_SPECIAL_ACCESSORS) // elidable when the early-termination check is enabled
+                && check_for_special_accessors(elem->key, elem->value)) {
+                o->flags |= MP_TYPE_FLAG_HAS_SPECIAL_ACCESSORS;
             }
+
+            #if MICROPY_PY_DESCRIPTORS
+            setname_tail = setname_maybe_bind_append(setname_tail, elem->key, elem->value);
+            #endif
         }
     }
-    #endif
+    #endif // ENABLE_SPECIAL_ACCESSORS
 
     const mp_obj_type_t *native_base;
     size_t num_native_bases = instance_count_native_bases(o, &native_base);
@@ -1217,8 +1292,7 @@ mp_obj_t mp_obj_new_type(qstr name, mp_obj_t bases_tuple, mp_obj_t locals_dict) 
         mp_raise_TypeError(MP_ERROR_TEXT("multiple bases have instance lay-out conflict"));
     }
 
-    mp_map_t *locals_map = &MP_OBJ_TYPE_GET_SLOT(o, locals_dict)->map;
-    mp_map_elem_t *elem = mp_map_lookup(locals_map, MP_OBJ_NEW_QSTR(MP_QSTR___new__), MP_MAP_LOOKUP);
+    mp_map_elem_t *elem = mp_map_lookup(&locals_ptr->map, MP_OBJ_NEW_QSTR(MP_QSTR___new__), MP_MAP_LOOKUP);
     if (elem != NULL) {
         // __new__ slot exists; check if it is a function
         if (mp_obj_is_fun(elem->value)) {
@@ -1226,6 +1300,10 @@ mp_obj_t mp_obj_new_type(qstr name, mp_obj_t bases_tuple, mp_obj_t locals_dict) 
             elem->value = static_class_method_make_new(&mp_type_staticmethod, 1, 0, &elem->value);
         }
     }
+
+    #if MICROPY_PY_DESCRIPTORS
+    setname_consume_call_all(&setname_list, MP_OBJ_FROM_PTR(o));
+    #endif
 
     return MP_OBJ_FROM_PTR(o);
 }
@@ -1254,9 +1332,15 @@ static mp_obj_t super_make_new(const mp_obj_type_t *type_in, size_t n_args, size
     // 0 arguments are turned into 2 in the compiler
     // 1 argument is not yet implemented
     mp_arg_check_num(n_args, n_kw, 2, 2, false);
-    if (!mp_obj_is_type(args[0], &mp_type_type)) {
+
+    // Per CPython: "If the second argument is an object, isinstance(obj, type) must be true.
+    // If the second argument is a type, issubclass(type2, type) must be true (this is useful for classmethods)."
+    const mp_obj_type_t *second_arg_type = mp_obj_get_type(args[1]);
+    mp_obj_t second_arg_obj = second_arg_type == &mp_type_type ? args[1] : MP_OBJ_FROM_PTR(second_arg_type);
+    if (mp_obj_is_subclass(second_arg_obj, args[0]) == mp_const_false) {
         mp_raise_TypeError(NULL);
     }
+
     mp_obj_super_t *o = m_new_obj(mp_obj_super_t);
     *o = (mp_obj_super_t) {{type_in}, args[0], args[1]};
     return MP_OBJ_FROM_PTR(o);

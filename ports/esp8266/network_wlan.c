@@ -31,6 +31,7 @@
 #include "py/objlist.h"
 #include "py/runtime.h"
 #include "py/mphal.h"
+#include "py/parsenum.h"
 #include "extmod/modnetwork.h"
 #include "shared/netutils/netutils.h"
 #include "queue.h"
@@ -40,6 +41,8 @@
 #include "ets_alt_task.h"
 #include "lwip/dns.h"
 #include "modnetwork.h"
+
+#define IPADDR_STRLEN_MAX  (20)
 
 typedef struct _wlan_if_obj_t {
     mp_obj_base_t base;
@@ -167,6 +170,29 @@ static mp_obj_t esp_disconnect(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(esp_disconnect_obj, esp_disconnect);
 
+static void build_stations_list_cleanup_callback(void *station_info) {
+    if (station_info != NULL) {
+        wifi_softap_free_station_info();
+    }
+}
+
+static mp_obj_t build_stations_list(void) {
+    struct station_info *info = wifi_softap_get_station_info();
+    MP_DEFINE_NLR_JUMP_CALLBACK_FUNCTION_1(ctx, build_stations_list_cleanup_callback, (void *)info);
+    nlr_push_jump_callback(&ctx.callback, mp_call_function_1_from_nlr_jump_callback);
+    mp_obj_list_t *stations = MP_OBJ_TO_PTR(mp_obj_new_list(0, NULL));
+    struct station_info *current = info;
+    mp_obj_t entry[2] = { 0 };
+    while (current != NULL) {
+        entry[0] = mp_obj_new_bytes(current->bssid, sizeof(current->bssid));
+        entry[1] = netutils_format_ipv4_addr((uint8_t *)&current->ip.addr, NETUTILS_BIG);
+        mp_obj_list_append(stations, mp_obj_new_tuple(2, entry));
+        current = STAILQ_NEXT(current, next);
+    }
+    nlr_pop_jump_callback(true);
+    return MP_OBJ_FROM_PTR(stations);
+}
+
 static mp_obj_t esp_status(size_t n_args, const mp_obj_t *args) {
     wlan_if_obj_t *self = MP_OBJ_TO_PTR(args[0]);
     if (n_args == 1) {
@@ -182,6 +208,12 @@ static mp_obj_t esp_status(size_t n_args, const mp_obj_t *args) {
                 if (self->if_id == STATION_IF) {
                     return MP_OBJ_NEW_SMALL_INT(wifi_station_get_rssi());
                 }
+                break;
+            case MP_QSTR_stations:
+                if (self->if_id == SOFTAP_IF) {
+                    return build_stations_list();
+                }
+                break;
         }
         mp_raise_ValueError(MP_ERROR_TEXT("unknown status param"));
     }
@@ -330,6 +362,173 @@ static mp_obj_t esp_ifconfig(size_t n_args, const mp_obj_t *args) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(esp_ifconfig_obj, 1, 2, esp_ifconfig);
 
+static mp_obj_t esp_network_ipconfig(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+    if (kwargs->used == 0) {
+        // Get config value
+        if (n_args != 1) {
+            mp_raise_TypeError(MP_ERROR_TEXT("must query one param"));
+        }
+
+        switch (mp_obj_str_get_qstr(args[0])) {
+            case MP_QSTR_dns: {
+                char addr_str[IPADDR_STRLEN_MAX];
+                ip_addr_t dns_addr = dns_getserver(0);
+                ipaddr_ntoa_r(&dns_addr, addr_str, sizeof(addr_str));
+                return mp_obj_new_str_from_cstr(addr_str);
+            }
+            default: {
+                mp_raise_ValueError(MP_ERROR_TEXT("unexpected key"));
+                break;
+            }
+        }
+    } else {
+        // Set config value(s)
+        if (n_args != 0) {
+            mp_raise_TypeError(MP_ERROR_TEXT("can't specify pos and kw args"));
+        }
+
+        for (size_t i = 0; i < kwargs->alloc; ++i) {
+            if (MP_MAP_SLOT_IS_FILLED(kwargs, i)) {
+                mp_map_elem_t *e = &kwargs->table[i];
+                switch (mp_obj_str_get_qstr(e->key)) {
+                    case MP_QSTR_dns: {
+                        ip_addr_t dns;
+                        size_t addr_len;
+                        const char *addr_str = mp_obj_str_get_data(e->value, &addr_len);
+                        if (!ipaddr_aton(addr_str, &dns)) {
+                            mp_raise_ValueError(MP_ERROR_TEXT("invalid arguments as dns server"));
+                        }
+                        dns_setserver(0, &dns);
+                        break;
+                    }
+                    default: {
+                        mp_raise_ValueError(MP_ERROR_TEXT("unexpected key"));
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    return mp_const_none;
+}
+MP_DEFINE_CONST_FUN_OBJ_KW(esp_network_ipconfig_obj, 0, esp_network_ipconfig);
+
+static mp_obj_t esp_ipconfig(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+    wlan_if_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    struct ip_info info;
+    wifi_get_ip_info(self->if_id, &info);
+
+    if (kwargs->used == 0) {
+        // Get config value
+        if (n_args != 2) {
+            mp_raise_TypeError(MP_ERROR_TEXT("must query one param"));
+        }
+
+        switch (mp_obj_str_get_qstr(args[1])) {
+            case MP_QSTR_dhcp4: {
+                if (self->if_id == STATION_IF) {
+                    return mp_obj_new_bool(wifi_station_dhcpc_status() == DHCP_STARTED);
+                } else if (self->if_id == SOFTAP_IF) {
+                    return mp_obj_new_bool(wifi_softap_dhcps_status() == DHCP_STARTED);
+                } else {
+                    mp_raise_ValueError(MP_ERROR_TEXT("unexpected key"));
+                    break;
+                }
+            }
+            case MP_QSTR_addr4: {
+                mp_obj_t tuple[2] = {
+                    netutils_format_ipv4_addr((uint8_t *)&info.ip, NETUTILS_BIG),
+                    netutils_format_ipv4_addr((uint8_t *)&info.netmask, NETUTILS_BIG),
+                };
+                return mp_obj_new_tuple(2, tuple);
+            }
+            case MP_QSTR_gw4: {
+                return netutils_format_ipv4_addr((uint8_t *)&info.gw, NETUTILS_BIG);
+            }
+            default: {
+                mp_raise_ValueError(MP_ERROR_TEXT("unexpected key"));
+                break;
+            }
+        }
+        return mp_const_none;
+    } else {
+        // Set config value(s)
+        if (n_args != 1) {
+            mp_raise_TypeError(MP_ERROR_TEXT("can't specify pos and kw args"));
+        }
+        int touched_ip_info = 0;
+        for (size_t i = 0; i < kwargs->alloc; ++i) {
+            if (MP_MAP_SLOT_IS_FILLED(kwargs, i)) {
+                mp_map_elem_t *e = &kwargs->table[i];
+                switch (mp_obj_str_get_qstr(e->key)) {
+                    case MP_QSTR_dhcp4: {
+                        if (self->if_id == STATION_IF) {
+                            enum dhcp_status status = wifi_station_dhcpc_status();
+                            if (mp_obj_is_true(e->value) && status != DHCP_STARTED) {
+                                wifi_station_dhcpc_start();
+                            } else if (!mp_obj_is_true(e->value) && status == DHCP_STARTED) {
+                                wifi_station_dhcpc_stop();
+                            }
+                        } else {
+                            mp_raise_ValueError(MP_ERROR_TEXT("unexpected key"));
+                            break;
+                        }
+                        break;
+                    }
+                    case MP_QSTR_addr4: {
+                        if (e->value != mp_const_none && mp_obj_is_str(e->value)) {
+                            size_t addr_len;
+                            const char *input_str = mp_obj_str_get_data(e->value, &addr_len);
+                            char *split = strchr(input_str, '/');
+                            if (split) {
+                                mp_obj_t prefix_obj = mp_parse_num_integer(split + 1, strlen(split + 1), 10, NULL);
+                                int prefix_bits = mp_obj_get_int(prefix_obj);
+                                uint32_t mask = -(1u << (32 - prefix_bits));
+                                uint32_t *m = (uint32_t *)&info.netmask;
+                                *m = htonl(mask);
+                            }
+                            netutils_parse_ipv4_addr(e->value, (void *)&info.ip, NETUTILS_BIG);
+                        } else if (e->value != mp_const_none) {
+                            mp_obj_t *items;
+                            mp_obj_get_array_fixed_n(e->value, 2, &items);
+                            netutils_parse_ipv4_addr(items[0], (void *)&info.ip, NETUTILS_BIG);
+                            netutils_parse_ipv4_addr(items[1], (void *)&info.netmask, NETUTILS_BIG);
+                        }
+                        touched_ip_info = 1;
+                        break;
+                    }
+                    case MP_QSTR_gw4: {
+                        netutils_parse_ipv4_addr(e->value, (void *)&info.gw, NETUTILS_BIG);
+                        touched_ip_info = 1;
+                        break;
+                    }
+                    default: {
+                        mp_raise_ValueError(MP_ERROR_TEXT("unexpected key"));
+                        break;
+                    }
+                }
+            }
+        }
+        bool restart_dhcp_server = false;
+        if (self->if_id == STATION_IF) {
+            if (touched_ip_info) {
+                wifi_station_dhcpc_stop();
+                wifi_set_ip_info(self->if_id, &info);
+            }
+        } else {
+            restart_dhcp_server = wifi_softap_dhcps_status();
+            wifi_softap_dhcps_stop();
+            wifi_set_ip_info(self->if_id, &info);
+        }
+        if (restart_dhcp_server) {
+            wifi_softap_dhcps_start();
+        }
+
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_KW(esp_nic_ipconfig_obj, 1, esp_ipconfig);
+
 static mp_obj_t esp_config(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
     if (n_args != 1 && kwargs->used != 0) {
         mp_raise_TypeError(MP_ERROR_TEXT("either pos or kw args are allowed"));
@@ -395,8 +594,8 @@ static mp_obj_t esp_config(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs
                         break;
                     }
                     case MP_QSTR_channel: {
-                        req_if = SOFTAP_IF;
                         cfg.ap.channel = mp_obj_get_int(kwargs->table[i].value);
+                        error_check(wifi_set_channel(cfg.ap.channel), "can't set channel");
                         break;
                     }
                     case MP_QSTR_hostname:
@@ -456,7 +655,7 @@ static mp_obj_t esp_config(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs
         case MP_QSTR_ssid:
         case MP_QSTR_essid:
             if (self->if_id == STATION_IF) {
-                val = mp_obj_new_str((char *)cfg.sta.ssid, strlen((char *)cfg.sta.ssid));
+                val = mp_obj_new_str_from_cstr((char *)cfg.sta.ssid);
             } else {
                 val = mp_obj_new_str((char *)cfg.ap.ssid, cfg.ap.ssid_len);
             }
@@ -471,8 +670,7 @@ static mp_obj_t esp_config(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs
             val = MP_OBJ_NEW_SMALL_INT(cfg.ap.authmode);
             break;
         case MP_QSTR_channel:
-            req_if = SOFTAP_IF;
-            val = MP_OBJ_NEW_SMALL_INT(cfg.ap.channel);
+            val = MP_OBJ_NEW_SMALL_INT(wifi_get_channel());
             break;
         case MP_QSTR_hostname:
         case MP_QSTR_dhcp_hostname: {
@@ -514,8 +712,18 @@ static const mp_rom_map_elem_t wlan_if_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_isconnected), MP_ROM_PTR(&esp_isconnected_obj) },
     { MP_ROM_QSTR(MP_QSTR_config), MP_ROM_PTR(&esp_config_obj) },
     { MP_ROM_QSTR(MP_QSTR_ifconfig), MP_ROM_PTR(&esp_ifconfig_obj) },
+    { MP_ROM_QSTR(MP_QSTR_ipconfig), MP_ROM_PTR(&esp_nic_ipconfig_obj) },
 
     // Constants
+    { MP_ROM_QSTR(MP_QSTR_IF_STA), MP_ROM_INT(STATION_IF)},
+    { MP_ROM_QSTR(MP_QSTR_IF_AP), MP_ROM_INT(SOFTAP_IF)},
+
+    { MP_ROM_QSTR(MP_QSTR_SEC_OPEN), MP_ROM_INT(AUTH_OPEN) },
+    { MP_ROM_QSTR(MP_QSTR_SEC_WEP), MP_ROM_INT(AUTH_WEP) },
+    { MP_ROM_QSTR(MP_QSTR_SEC_WPA), MP_ROM_INT(AUTH_WPA_PSK) },
+    { MP_ROM_QSTR(MP_QSTR_SEC_WPA2), MP_ROM_INT(AUTH_WPA2_PSK) },
+    { MP_ROM_QSTR(MP_QSTR_SEC_WPA_WPA2), MP_ROM_INT(AUTH_WPA_WPA2_PSK) },
+
     { MP_ROM_QSTR(MP_QSTR_PM_NONE), MP_ROM_INT(NONE_SLEEP_T) },
     { MP_ROM_QSTR(MP_QSTR_PM_PERFORMANCE), MP_ROM_INT(MODEM_SLEEP_T) },
     { MP_ROM_QSTR(MP_QSTR_PM_POWERSAVE), MP_ROM_INT(LIGHT_SLEEP_T) },

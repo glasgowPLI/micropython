@@ -1537,7 +1537,8 @@ mp_int_t mpz_hash(const mpz_t *z) {
     mp_uint_t val = 0;
     mpz_dig_t *d = z->dig + z->len;
 
-    while (d-- > z->dig) {
+    while (d > z->dig) {
+        d--;
         val = (val << DIG_SIZE) | *d;
     }
 
@@ -1552,11 +1553,12 @@ bool mpz_as_int_checked(const mpz_t *i, mp_int_t *value) {
     mp_uint_t val = 0;
     mpz_dig_t *d = i->dig + i->len;
 
-    while (d-- > i->dig) {
+    while (d > i->dig) {
         if (val > (~(MP_OBJ_WORD_MSBIT_HIGH) >> DIG_SIZE)) {
             // will overflow
             return false;
         }
+        d--;
         val = (val << DIG_SIZE) | *d;
     }
 
@@ -1577,11 +1579,12 @@ bool mpz_as_uint_checked(const mpz_t *i, mp_uint_t *value) {
     mp_uint_t val = 0;
     mpz_dig_t *d = i->dig + i->len;
 
-    while (d-- > i->dig) {
+    while (d > i->dig) {
         if (val > (~(MP_OBJ_WORD_MSBIT_HIGH) >> (DIG_SIZE - 1))) {
             // will overflow
             return false;
         }
+        d--;
         val = (val << DIG_SIZE) | *d;
     }
 
@@ -1589,7 +1592,7 @@ bool mpz_as_uint_checked(const mpz_t *i, mp_uint_t *value) {
     return true;
 }
 
-void mpz_as_bytes(const mpz_t *z, bool big_endian, size_t len, byte *buf) {
+bool mpz_as_bytes(const mpz_t *z, bool big_endian, bool as_signed, size_t len, byte *buf) {
     byte *b = buf;
     if (big_endian) {
         b += len;
@@ -1598,6 +1601,8 @@ void mpz_as_bytes(const mpz_t *z, bool big_endian, size_t len, byte *buf) {
     int bits = 0;
     mpz_dbl_dig_t d = 0;
     mpz_dbl_dig_t carry = 1;
+    size_t olen = len; // bytes in output buffer
+    bool ok = true;
     for (size_t zlen = z->len; zlen > 0; --zlen) {
         bits += DIG_SIZE;
         d = (d << DIG_SIZE) | *zdig++;
@@ -1607,28 +1612,32 @@ void mpz_as_bytes(const mpz_t *z, bool big_endian, size_t len, byte *buf) {
                 val = (~val & 0xff) + carry;
                 carry = val >> 8;
             }
+
+            if (!olen) {
+                // Buffer is full, only OK if all remaining bytes are zeroes
+                ok = ok && ((byte)val == 0);
+                continue;
+            }
+
             if (big_endian) {
                 *--b = val;
-                if (b == buf) {
-                    return;
-                }
             } else {
                 *b++ = val;
-                if (b == buf + len) {
-                    return;
-                }
             }
+            olen--;
         }
     }
 
-    // fill remainder of buf with zero/sign extension of the integer
-    if (big_endian) {
-        len = b - buf;
+    if (as_signed && olen == 0 && len > 0) {
+        // If output exhausted then ensure there was enough space for the sign bit
+        byte most_sig = big_endian ? buf[0] : buf[len - 1];
+        ok = ok && (bool)(most_sig & 0x80) == (bool)z->neg;
     } else {
-        len = buf + len - b;
-        buf = b;
+        // fill remainder of buf with zero/sign extension of the integer
+        memset(big_endian ? buf : b, z->neg ? 0xff : 0x00, olen);
     }
-    memset(buf, z->neg ? 0xff : 0x00, len);
+
+    return ok;
 }
 
 #if MICROPY_PY_BUILTINS_FLOAT
@@ -1636,7 +1645,8 @@ mp_float_t mpz_as_float(const mpz_t *i) {
     mp_float_t val = 0;
     mpz_dig_t *d = i->dig + i->len;
 
-    while (d-- > i->dig) {
+    while (d > i->dig) {
+        d--;
         val = val * DIG_BASE + *d;
     }
 
@@ -1665,6 +1675,8 @@ size_t mpz_as_str_inpl(const mpz_t *i, unsigned int base, const char *prefix, ch
     assert(2 <= base && base <= 32);
 
     size_t ilen = i->len;
+
+    int n_comma = (base == 10) ? 3 : 4;
 
     char *s = str;
     if (ilen == 0) {
@@ -1711,7 +1723,7 @@ size_t mpz_as_str_inpl(const mpz_t *i, unsigned int base, const char *prefix, ch
                 break;
             }
         }
-        if (comma && (s - last_comma) == 3) {
+        if (!done && comma && (s - last_comma) == n_comma) {
             *s++ = comma;
             last_comma = s;
         }

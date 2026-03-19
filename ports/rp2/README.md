@@ -37,7 +37,7 @@ You can also build the standard CMake way.  The final firmware is found in
 the top-level of the CMake build directory (`build` by default) and is
 called `firmware.uf2`.
 
-If you are using a different board other than a Rasoberry Pi Pico, then you should
+If you are using a board other than a Raspberry Pi Pico, you should
 pass the board name to the build; e.g. for Raspberry Pi Pico W:
 
     $ make BOARD=RPI_PICO_W submodules
@@ -47,8 +47,10 @@ pass the board name to the build; e.g. for Raspberry Pi Pico W:
 ## Deploying firmware to the device
 
 Firmware can be deployed to the device by putting it into bootloader mode
-(hold down BOOTSEL while powering on or resetting) and then copying
-`firmware.uf2` to the USB mass storage device that appears.
+(hold down BOOTSEL while powering on or resetting) and then either copying
+`firmware.uf2` to the USB mass storage device that appears, or using
+`picotool load -x firmware.elf`.  The latter command can be accessed
+conveniently via `make deploy`.
 
 If MicroPython is already installed then the bootloader can be entered by
 executing `import machine; machine.bootloader()` at the REPL.
@@ -69,7 +71,6 @@ from machine import Pin, Timer
 led = Pin(25, Pin.OUT)
 tim = Timer()
 def tick(timer):
-    global led
     led.toggle()
 
 tim.init(freq=2.5, mode=Timer.PERIODIC, callback=tick)

@@ -4,17 +4,16 @@
 class USBDevice -- USB Device driver
 ====================================
 
-.. note:: ``machine.USBDevice`` is currently only supported on the rp2 and samd
-          ports.
+.. note:: ``machine.USBDevice`` is currently only supported for esp32, rp2 and
+          samd ports. Native USB support is also required, and not every board
+          supports native USB.
 
 USBDevice provides a low-level Python API for implementing USB device functions using
-Python code. This low-level API assumes familiarity with the USB standard. It's
-not recommended to use this API directly, instead install the high-level usbd
-module from micropython-lib.
+Python code.
 
-.. warning:: This functionality is very new and the high-level usbd module is
-             not yet merged into micropython-lib. It can be found `here on
-             GitHub <https://github.com/micropython/micropython-lib/pull/558>`_.
+.. warning:: This low-level API assumes familiarity with the USB standard. There
+   are high-level `usb driver modules in micropython-lib`_ which provide a
+   simpler interface and more built-in functionality.
 
 Terminology
 -----------
@@ -34,10 +33,10 @@ Managing a runtime USB interface can be tricky, especially if you are communicat
 with MicroPython over a built-in USB-CDC serial port that's part of the same USB
 device.
 
-- A MicroPython soft reset will always clear all runtime USB interfaces, which
-  results in the entire USB device disconnecting from the host. If MicroPython
-  is also providing a built-in USB-CDC serial port then this will re-appear
-  after the soft reset.
+- A MicroPython :ref:`soft reset <soft_reset>` will always clear all runtime USB
+  interfaces, which results in the entire USB device disconnecting from the
+  host. If MicroPython is also providing a built-in USB-CDC serial port then
+  this will re-appear after the soft reset.
 
   This means some functions (like ``mpremote run``) that target the USB-CDC
   serial port will immediately fail if a runtime USB interface is active,
@@ -46,9 +45,9 @@ device.
   no more runtime USB interface.
 
 - To configure a runtime USB device on every boot, it's recommended to place the
-  configuration code in the ``boot.py`` file on the :ref:`device VFS
+  configuration code in the :ref:`boot.py` file on the :ref:`device VFS
   <filesystem>`. On each reset this file is executed before the USB subsystem is
-  initialised (and before ``main.py``), so it allows the board to come up with the runtime
+  initialised (and before :ref:`main.py`), so it allows the board to come up with the runtime
   USB device immediately.
 
 - For development or debugging, it may be convenient to connect a hardware
@@ -130,15 +129,25 @@ Methods
 
       Second argument is a memoryview to read the USB control request
       data for this stage. The memoryview is only valid until the
-      callback function returns.
+      callback function returns. Data in this memoryview will be the same
+      across each of the three stages of a single transfer.
+
+      A successful transfer consists of this callback being called in sequence
+      for the three stages. Generally speaking, if a device wants to do
+      something in response to a control request then it's best to wait until
+      the ACK stage to confirm the host controller completed the transfer as
+      expected.
 
       The callback should return one of the following values:
 
-      - ``False`` to stall the endpoint and reject the transfer.
+      - ``False`` to stall the endpoint and reject the transfer. It won't
+        proceed to any remaining stages.
       - ``True`` to continue the transfer to the next stage.
-      - A buffer object to provide data for this stage of the transfer.
-        This should be a writable buffer for an ``OUT`` direction transfer, or a
-        readable buffer with data for an ``IN`` direction transfer.
+      - A buffer object can be returned at the SETUP stage when the transfer
+        will send or receive additional data. Typically this is the case when
+        the ``wLength`` field in the request has a non-zero value. This should
+        be a writable buffer for an ``OUT`` direction transfer, or a readable
+        buffer with data for an ``IN`` direction transfer.
 
     - ``xfer_cb`` - This callback is called whenever a non-control
       transfer submitted by calling :func:`USBDevice.submit_xfer` completes.
@@ -176,7 +185,7 @@ Methods
     necessary if the runtime device configuration has changed, so that
     the host sees the new device.
 
-.. attribute:: USDBD.builtin_driver
+.. attribute:: USBDevice.builtin_driver
 
    This attribute holds the current built-in driver configuration, and must be
    set to one of the ``USBDevice.BUILTIN_`` named constants defined on this object.
@@ -206,6 +215,13 @@ Methods
      value ``None``. This reserves those string indexes for the built-in
      drivers. Placing a different string at any of these indexes overrides that
      string in the built-in driver.
+
+.. method:: USBDevice.remote_wakeup(self)
+
+    Wake up host if we are in suspend mode and the REMOTE_WAKEUP feature
+    is enabled by the host. This has to be enabled in the USB attributes,
+    and on the host. Returns ``True`` if remote wakeup was enabled and
+    active and the host was woken up.
 
 .. method:: USBDevice.submit_xfer(self, ep, buffer /)
 
@@ -284,3 +300,5 @@ Constants
             descriptor.
           - ``desc_cfg`` - ``bytes`` object containing the complete built-in USB
             configuration descriptor.
+
+.. _usb driver modules in micropython-lib: https://github.com/micropython/micropython-lib/tree/master/micropython/usb#readme

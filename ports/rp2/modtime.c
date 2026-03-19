@@ -26,28 +26,18 @@
 
 #include "py/obj.h"
 #include "shared/timeutils/timeutils.h"
-#include "hardware/rtc.h"
+#include "pico/aon_timer.h"
 
-// Return the localtime as an 8-tuple.
-static mp_obj_t mp_time_localtime_get(void) {
-    datetime_t t;
-    rtc_get_datetime(&t);
-    mp_obj_t tuple[8] = {
-        mp_obj_new_int(t.year),
-        mp_obj_new_int(t.month),
-        mp_obj_new_int(t.day),
-        mp_obj_new_int(t.hour),
-        mp_obj_new_int(t.min),
-        mp_obj_new_int(t.sec),
-        mp_obj_new_int(t.dotw),
-        mp_obj_new_int(timeutils_year_day(t.year, t.month, t.day)),
-    };
-    return mp_obj_new_tuple(8, tuple);
+// Get the localtime.
+static void mp_time_localtime_get(timeutils_struct_time_t *tm) {
+    struct timespec ts;
+    aon_timer_get_time(&ts);
+    timeutils_seconds_since_epoch_to_struct_time(ts.tv_sec, tm);
 }
 
 // Return the number of seconds since the Epoch.
 static mp_obj_t mp_time_time_get(void) {
-    datetime_t t;
-    rtc_get_datetime(&t);
-    return mp_obj_new_int_from_ull(timeutils_seconds_since_epoch(t.year, t.month, t.day, t.hour, t.min, t.sec));
+    struct timespec ts;
+    aon_timer_get_time(&ts);
+    return mp_obj_new_int_from_ull(ts.tv_sec);
 }

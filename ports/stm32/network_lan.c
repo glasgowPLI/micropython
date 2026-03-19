@@ -33,6 +33,11 @@
 
 #include "lwip/netif.h"
 
+// A board can customize the default PHY by defining this setting.
+#ifndef NETWORK_LAN_PHY
+#define NETWORK_LAN_PHY ETH_PHY_LAN8742
+#endif
+
 typedef struct _network_lan_obj_t {
     mp_obj_base_t base;
     eth_t *eth;
@@ -57,7 +62,7 @@ static mp_obj_t network_lan_make_new(const mp_obj_type_t *type, size_t n_args, s
     enum { ARG_phy_addr, ARG_phy_type};
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_phy_addr, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 0} },
-        { MP_QSTR_phy_type, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = ETH_PHY_LAN8742} },
+        { MP_QSTR_phy_type, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = NETWORK_LAN_PHY} },
     };
     // Parse args.
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
@@ -100,6 +105,12 @@ static mp_obj_t network_lan_ifconfig(size_t n_args, const mp_obj_t *args) {
     return mod_network_nic_ifconfig(eth_netif(self->eth), n_args - 1, args + 1);
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(network_lan_ifconfig_obj, 1, 2, network_lan_ifconfig);
+
+static mp_obj_t network_lan_ipconfig(size_t n_args, const mp_obj_t *args, mp_map_t *kwargs) {
+    network_lan_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    return mod_network_nic_ipconfig(eth_netif(self->eth), n_args - 1, args + 1, kwargs);
+}
+static MP_DEFINE_CONST_FUN_OBJ_KW(network_lan_ipconfig_obj, 1, network_lan_ipconfig);
 
 static mp_obj_t network_lan_status(size_t n_args, const mp_obj_t *args) {
     network_lan_obj_t *self = MP_OBJ_TO_PTR(args[0]);
@@ -163,6 +174,7 @@ static const mp_rom_map_elem_t network_lan_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_active), MP_ROM_PTR(&network_lan_active_obj) },
     { MP_ROM_QSTR(MP_QSTR_isconnected), MP_ROM_PTR(&network_lan_isconnected_obj) },
     { MP_ROM_QSTR(MP_QSTR_ifconfig), MP_ROM_PTR(&network_lan_ifconfig_obj) },
+    { MP_ROM_QSTR(MP_QSTR_ipconfig), MP_ROM_PTR(&network_lan_ipconfig_obj) },
     { MP_ROM_QSTR(MP_QSTR_status), MP_ROM_PTR(&network_lan_status_obj) },
     { MP_ROM_QSTR(MP_QSTR_config), MP_ROM_PTR(&network_lan_config_obj) },
 

@@ -44,10 +44,16 @@
 #define MICROPY_HW_USB_CDC_TX_TIMEOUT (500)
 
 extern int mp_interrupt_char;
+extern ringbuf_t stdin_ringbuf;
 extern volatile uint32_t systick_ms;
 uint64_t mp_hal_ticks_us_64(void);
+void mp_hal_time_ns_set_from_rtc(void);
 
 void mp_hal_set_interrupt_char(int c);
+
+static inline void mp_hal_wake_main_task_from_isr(void) {
+    // Defined for tinyusb support, nothing needs to be done here.
+}
 
 __attribute__((always_inline)) static inline void enable_irq(uint32_t state) {
     __set_PRIMASK(state);
@@ -88,10 +94,6 @@ static inline mp_uint_t mp_hal_ticks_cpu(void) {
     return (system_time_t)DWT->CYCCNT;
 }
 #endif
-
-static inline uint64_t mp_hal_time_ns(void) {
-    return mp_hal_ticks_us_64() * 1000;
-}
 
 // C-level pin HAL
 

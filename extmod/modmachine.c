@@ -24,6 +24,7 @@
  * THE SOFTWARE.
  */
 
+#include "py/builtin.h"
 #include "py/runtime.h"
 
 #if MICROPY_PY_MACHINE
@@ -35,16 +36,20 @@
 #include "drivers/dht/dht.h"
 #endif
 
+#if !MICROPY_PY_SYS_EXIT
+#error MICROPY_PY_MACHINE requires MICROPY_PY_SYS_EXIT
+#endif
+
 // The port must provide implementations of these low-level machine functions.
 
 static void mp_machine_idle(void);
 
 #if MICROPY_PY_MACHINE_BOOTLOADER
-NORETURN void mp_machine_bootloader(size_t n_args, const mp_obj_t *args);
+MP_NORETURN void mp_machine_bootloader(size_t n_args, const mp_obj_t *args);
 #endif
 
 #if MICROPY_PY_MACHINE_RESET
-NORETURN static void mp_machine_reset(void);
+MP_NORETURN static void mp_machine_reset(void);
 static mp_int_t mp_machine_reset_cause(void);
 #endif
 
@@ -53,7 +58,7 @@ static mp_obj_t mp_machine_unique_id(void);
 static mp_obj_t mp_machine_get_freq(void);
 static void mp_machine_set_freq(size_t n_args, const mp_obj_t *args);
 static void mp_machine_lightsleep(size_t n_args, const mp_obj_t *args);
-NORETURN static void mp_machine_deepsleep(size_t n_args, const mp_obj_t *args);
+MP_NORETURN static void mp_machine_deepsleep(size_t n_args, const mp_obj_t *args);
 #endif
 
 // The port can provide additional machine-module implementation in this file.
@@ -61,14 +66,8 @@ NORETURN static void mp_machine_deepsleep(size_t n_args, const mp_obj_t *args);
 #include MICROPY_PY_MACHINE_INCLUDEFILE
 #endif
 
-static mp_obj_t machine_soft_reset(void) {
-    pyexec_system_exit = PYEXEC_FORCED_EXIT;
-    mp_raise_type(&mp_type_SystemExit);
-}
-static MP_DEFINE_CONST_FUN_OBJ_0(machine_soft_reset_obj, machine_soft_reset);
-
 #if MICROPY_PY_MACHINE_BOOTLOADER
-NORETURN mp_obj_t machine_bootloader(size_t n_args, const mp_obj_t *args) {
+MP_NORETURN mp_obj_t machine_bootloader(size_t n_args, const mp_obj_t *args) {
     mp_machine_bootloader(n_args, args);
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(machine_bootloader_obj, 0, 1, machine_bootloader);
@@ -82,7 +81,7 @@ static MP_DEFINE_CONST_FUN_OBJ_0(machine_idle_obj, machine_idle);
 
 #if MICROPY_PY_MACHINE_RESET
 
-NORETURN static mp_obj_t machine_reset(void) {
+MP_NORETURN static mp_obj_t machine_reset(void) {
     mp_machine_reset();
 }
 MP_DEFINE_CONST_FUN_OBJ_0(machine_reset_obj, machine_reset);
@@ -109,7 +108,7 @@ static mp_obj_t machine_freq(size_t n_args, const mp_obj_t *args) {
         return mp_const_none;
     }
 }
-MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(machine_freq_obj, 0, 1, machine_freq);
+MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(machine_freq_obj, 0, MICROPY_PY_MACHINE_FREQ_NUM_ARGS_MAX, machine_freq);
 
 static mp_obj_t machine_lightsleep(size_t n_args, const mp_obj_t *args) {
     mp_machine_lightsleep(n_args, args);
@@ -117,7 +116,7 @@ static mp_obj_t machine_lightsleep(size_t n_args, const mp_obj_t *args) {
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(machine_lightsleep_obj, 0, 1, machine_lightsleep);
 
-NORETURN static mp_obj_t machine_deepsleep(size_t n_args, const mp_obj_t *args) {
+MP_NORETURN static mp_obj_t machine_deepsleep(size_t n_args, const mp_obj_t *args) {
     mp_machine_deepsleep(n_args, args);
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(machine_deepsleep_obj, 0, 1, machine_deepsleep);
@@ -157,7 +156,7 @@ static const mp_rom_map_elem_t machine_module_globals_table[] = {
     #endif
 
     // Reset related functions.
-    { MP_ROM_QSTR(MP_QSTR_soft_reset), MP_ROM_PTR(&machine_soft_reset_obj) },
+    { MP_ROM_QSTR(MP_QSTR_soft_reset), MP_ROM_PTR(&mp_sys_exit_obj) },
     #if MICROPY_PY_MACHINE_BOOTLOADER
     { MP_ROM_QSTR(MP_QSTR_bootloader), MP_ROM_PTR(&machine_bootloader_obj) },
     #endif
@@ -219,6 +218,9 @@ static const mp_rom_map_elem_t machine_module_globals_table[] = {
     #endif
     #if MICROPY_PY_MACHINE_I2C
     { MP_ROM_QSTR(MP_QSTR_I2C), MP_ROM_PTR(&machine_i2c_type) },
+    #endif
+    #if MICROPY_PY_MACHINE_I2C_TARGET
+    { MP_ROM_QSTR(MP_QSTR_I2CTarget), MP_ROM_PTR(&machine_i2c_target_type) },
     #endif
     #if MICROPY_PY_MACHINE_I2S
     { MP_ROM_QSTR(MP_QSTR_I2S), MP_ROM_PTR(&machine_i2s_type) },

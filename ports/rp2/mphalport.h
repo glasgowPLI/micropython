@@ -30,7 +30,6 @@
 #include "pico/time.h"
 #include "hardware/clocks.h"
 #include "hardware/structs/systick.h"
-#include "RP2040.h" // cmsis, for __WFI
 #include "pendsv.h"
 
 #define SYSTICK_MAX (0xffffff)
@@ -62,12 +61,15 @@
         if ((TIMEOUT_MS) < 0) { \
             __wfe(); \
         } else { \
-            best_effort_wfe_or_timeout(make_timeout_time_ms(TIMEOUT_MS)); \
+            mp_wfe_or_timeout(TIMEOUT_MS); \
         } \
     } while (0)
 
 extern int mp_interrupt_char;
 extern ringbuf_t stdin_ringbuf;
+
+// Port-specific function to create a wakeup interrupt after timeout_ms and enter WFE
+void mp_wfe_or_timeout(uint32_t timeout_ms);
 
 uint32_t mp_thread_begin_atomic_section(void);
 void mp_thread_end_atomic_section(uint32_t);
@@ -75,8 +77,8 @@ void mp_thread_end_atomic_section(uint32_t);
 void mp_hal_set_interrupt_char(int c);
 void mp_hal_time_ns_set_from_rtc(void);
 
-static inline void mp_hal_delay_us(mp_uint_t us) {
-    sleep_us(us);
+static inline void mp_hal_wake_main_task_from_isr(void) {
+    // Defined for tinyusb support, nothing needs to be done here.
 }
 
 static inline void mp_hal_delay_us_fast(mp_uint_t us) {
@@ -94,11 +96,15 @@ static inline mp_uint_t mp_hal_ticks_ms(void) {
     return to_ms_since_boot(get_absolute_time());
 }
 
+#if PICO_ARM
 static inline mp_uint_t mp_hal_ticks_cpu(void) {
     // ticks_cpu() is defined as using the highest-resolution timing source
     // in the system. This is usually a CPU clock, but doesn't have to be.
     return time_us_32();
 }
+#elif PICO_RISCV
+mp_uint_t mp_hal_ticks_cpu(void);
+#endif
 
 static inline mp_uint_t mp_hal_get_cpu_freq(void) {
     return clock_get_hz(clk_sys);
@@ -117,7 +123,18 @@ static inline mp_uint_t mp_hal_get_cpu_freq(void) {
 #define MP_HAL_PIN_PULL_UP              (1)
 #define MP_HAL_PIN_PULL_DOWN            (2)
 
+// Open drain behaviour is simulated.
+#if NUM_BANK0_GPIOS > 32
+extern uint64_t machine_pin_open_drain_mask;
+#define GPIO_IS_OPEN_DRAIN(id)          (machine_pin_open_drain_mask & (1ULL << id))
+#define GPIO_ENABLE_OPEN_DRAIN(id)      (machine_pin_open_drain_mask |= (1ULL << id))
+#define GPIO_DISABLE_OPEN_DRAIN(id)     (machine_pin_open_drain_mask &= ~(1ULL << id))
+#else
 extern uint32_t machine_pin_open_drain_mask;
+#define GPIO_IS_OPEN_DRAIN(id)          (machine_pin_open_drain_mask & (1U << id))
+#define GPIO_ENABLE_OPEN_DRAIN(id)      (machine_pin_open_drain_mask |= (1U << id))
+#define GPIO_DISABLE_OPEN_DRAIN(id)     (machine_pin_open_drain_mask &= ~(1U << id))
+#endif
 
 mp_hal_pin_obj_t mp_hal_get_pin_obj(mp_obj_t pin_in);
 
@@ -127,13 +144,13 @@ static inline unsigned int mp_hal_pin_name(mp_hal_pin_obj_t pin) {
 
 static inline void mp_hal_pin_input(mp_hal_pin_obj_t pin) {
     gpio_set_dir(pin, GPIO_IN);
-    machine_pin_open_drain_mask &= ~(1 << pin);
+    GPIO_DISABLE_OPEN_DRAIN(pin);
     gpio_set_function(pin, GPIO_FUNC_SIO);
 }
 
 static inline void mp_hal_pin_output(mp_hal_pin_obj_t pin) {
     gpio_set_dir(pin, GPIO_OUT);
-    machine_pin_open_drain_mask &= ~(1 << pin);
+    GPIO_DISABLE_OPEN_DRAIN(pin);
     gpio_set_function(pin, GPIO_FUNC_SIO);
 }
 
@@ -145,7 +162,7 @@ static inline void mp_hal_pin_open_drain_with_value(mp_hal_pin_obj_t pin, int v)
         gpio_put(pin, 0);
         gpio_set_dir(pin, GPIO_OUT);
     }
-    machine_pin_open_drain_mask |= 1 << pin;
+    GPIO_ENABLE_OPEN_DRAIN(pin);
     gpio_set_function(pin, GPIO_FUNC_SIO);
 }
 
@@ -176,11 +193,11 @@ static inline void mp_hal_pin_od_high(mp_hal_pin_obj_t pin) {
 }
 
 static inline void mp_hal_pin_low(mp_hal_pin_obj_t pin) {
-    gpio_clr_mask(1 << pin);
+    gpio_clr_mask64(UINT64_C(1) << pin);
 }
 
 static inline void mp_hal_pin_high(mp_hal_pin_obj_t pin) {
-    gpio_set_mask(1 << pin);
+    gpio_set_mask64(UINT64_C(1) << pin);
 }
 
 enum mp_hal_pin_interrupt_trigger {
@@ -204,5 +221,6 @@ enum {
 void mp_hal_get_mac(int idx, uint8_t buf[6]);
 void mp_hal_get_mac_ascii(int idx, size_t chr_off, size_t chr_len, char *dest);
 void mp_hal_generate_laa_mac(int idx, uint8_t buf[6]);
+int mp_hal_is_pin_reserved(int n);
 
 #endif // MICROPY_INCLUDED_RP2_MPHALPORT_H

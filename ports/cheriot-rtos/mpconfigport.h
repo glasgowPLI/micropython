@@ -55,8 +55,15 @@ enum { SPI_MSB_FIRST, SPI_LSB_FIRST };
 // type definitions for the specific machine
 
 #include <stddef.h>
-typedef ssize_t mp_int_t;  // must be pointer size -- or does it?
-typedef size_t mp_uint_t;  // must be pointer size -- or does it?
+
+#define MP_INT_TYPE MP_INT_TYPE_OTHER
+
+typedef ssize_t mp_int_t;
+typedef size_t mp_uint_t;
+
+#define MP_INT_MAX INT_MAX
+#define MP_INT_MIN INT_MIN
+#define MP_UINT_MAX SIZE_MAX
 
 typedef long mp_off_t;
 

@@ -30,6 +30,7 @@
 
 #define SOFT_TIMER_FLAG_PY_CALLBACK (1)
 #define SOFT_TIMER_FLAG_GC_ALLOCATED (2)
+#define SOFT_TIMER_FLAG_HARD_CALLBACK (4)
 
 #define SOFT_TIMER_MODE_ONE_SHOT (1)
 #define SOFT_TIMER_MODE_PERIODIC (2)
@@ -81,6 +82,9 @@ static inline void soft_timer_reinsert(soft_timer_entry_t *entry, uint32_t initi
 //   pend-SV IRQ level, or equivalent.
 uint32_t soft_timer_get_ms(void);
 void soft_timer_schedule_at_ms(uint32_t ticks_ms);
+
+// Optional port-specific initialisation function (provided and called by the port if needed).
+void soft_timer_init(void);
 #endif
 
 #endif // MICROPY_INCLUDED_SHARED_RUNTIME_SOFTTIMER_H

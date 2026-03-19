@@ -21,16 +21,13 @@
 // Use the minimum headroom in the chunk allocator for parse nodes.
 #define MICROPY_ALLOC_PARSE_CHUNK_INIT    (16)
 
-// type definitions for the specific machine
+// Disable all optional sys module features.
+#define MICROPY_PY_SYS_MODULES            (0)
+#define MICROPY_PY_SYS_EXIT               (0)
+#define MICROPY_PY_SYS_PATH               (0)
+#define MICROPY_PY_SYS_ARGV               (0)
 
-#ifdef __CHERI_PURE_CAPABILITY__
-// On purecap builds we need our standard integer types not to carry provenance
-typedef int64_t mp_int_t; // must be pointer size -- or does it?
-typedef uint64_t mp_uint_t; // must be pointer size -- or does it?
-#else
-typedef intptr_t mp_int_t; // must be pointer size
-typedef uintptr_t mp_uint_t; // must be pointer size
-#endif
+// type definitions for the specific machine
 
 typedef long mp_off_t;
 
