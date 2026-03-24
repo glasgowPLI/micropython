@@ -342,6 +342,7 @@ typedef struct _mp_state_ctx_t {
 
 #define MP_STATE_THREAD_HACK_INIT(ctx) mp_state_thread_t thread_state_hack = {0}; \
     thread_state_hack.stack_top = (void *)&thread_state_hack; \
+    thread_state_hack.stack_limit = (((size_t)&thread_state_hack) - __builtin_cheri_base_get(__builtin_cheri_stack_get())) - MICROPY_STACK_CHECK_MARGIN; \
     thread_state_hack.mp_pending_exception = MP_OBJ_NULL; \
     thread_state_hack.context = ctx; \
     thread_state_hack.dict_globals = &thread_state_hack.context->vm.dict_main; \

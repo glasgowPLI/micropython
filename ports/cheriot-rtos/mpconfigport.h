@@ -52,6 +52,10 @@ enum { SPI_MSB_FIRST, SPI_LSB_FIRST };
 // avoid STORE_LOCAL violations with thread state
 #define MICROPY_PY_STATE_THREAD_HACK        (1)
 
+// Avoid stack overflows
+#define MICROPY_STACK_CHECK (1)
+#define MICROPY_STACK_CHECK_MARGIN (512)
+
 // type definitions for the specific machine
 
 #include <stddef.h>
