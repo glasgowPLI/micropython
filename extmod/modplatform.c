@@ -64,7 +64,11 @@ static MP_DEFINE_CONST_FUN_OBJ_KW(platform_libc_ver_obj, 0, platform_libc_ver);
 #ifdef __riscv
 static mp_obj_t platform_processor(void) {
     #if (__riscv_xlen <= 64) && !defined(__linux__)
+    #if CHERIOT_IBEX
+    uint32_t misa_csr = 0;
+    #else
     uintptr_t misa_csr = 0;
+    #endif
 
     // Load the MISA CSR directly.
     __asm volatile (

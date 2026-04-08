@@ -5,8 +5,6 @@
 
 #include "py/obj.h"
 
-#define mp_hal_ticks_ms() (0UL)
-
 #define mp_hal_set_interrupt_char(c) ((void)c)
 
 #define MP_HAL_FUNC __cheri_compartment("mp_hal")
@@ -34,6 +32,14 @@ bool MP_HAL_FUNC _uart_is_readable(volatile open_titan_uart_t *block);
 bool MP_HAL_FUNC _uart_is_writable(volatile open_titan_uart_t *block);
 bool MP_HAL_FUNC _uart_timeout_read(volatile open_titan_uart_t *block, uint8_t *out, uint32_t timeout_ms);
 void MP_HAL_FUNC _uart_blocking_write(volatile open_titan_uart_t *block, uint8_t data);
+
+uint64_t MP_HAL_FUNC get_time();
+
+#define mp_hal_ticks_cpu get_time
+#define mp_hal_ticks_ms() (get_time() * 1000UL / CPU_TIMER_HZ)
+#define mp_hal_ticks_us() (get_time() * 1000000UL / CPU_TIMER_HZ)
+#define mp_hal_delay_ms(x) do { uint64_t end = get_time() + (x * CPU_TIMER_HZ / 1000UL); while(get_time() < end); } while(0)
+#define mp_hal_delay_us(x) do { uint64_t end = get_time() + (x * CPU_TIMER_HZ / 1000UL); while(get_time() < end); } while(0)
 
 
 #define mp_hal_stdin_rx_chr _mp_hal_stdin_rx_chr

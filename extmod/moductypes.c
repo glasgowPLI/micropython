@@ -184,6 +184,9 @@ static mp_uint_t uctypes_struct_agg_size(mp_obj_tuple_t *t, int layout_type, mp_
             }
             return sizeof(void *);
         case ARRAY: {
+            if (t->len < 2) {
+                syntax_error();
+            }
             mp_int_t arr_sz = MP_OBJ_SMALL_INT_VALUE(t->items[1]);
             uint val_type = GET_TYPE(arr_sz, VAL_TYPE_BITS);
             arr_sz &= VALUE_MASK(VAL_TYPE_BITS);
